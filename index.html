@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Windy + GPX</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        #windy {
+            width: 100%;
+            height: 100vh;
+        }
+        
+        .controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+        }
+        
+        button {
+            display: block;
+            width: 180px;
+            margin: 5px 0;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: #007AFF;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        button:active { transform: scale(0.95); }
+        .strava-btn { background: #FC4C02; }
+        .clear-btn { background: #FF3B30; }
+        .test-btn { background: #34C759; }
+        
+        #status {
+            margin-top: 12px;
+            padding: 8px;
+            font-size: 11px;
+            background: rgba(0,0,0,0.05);
+            border-radius: 5px;
+            text-align: center;
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            text-align: center;
+            z-index: 2000;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007AFF;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="windy"></div>
+    
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <div>Lade Windy Karte...</div>
+    </div>
+    
+    <div class="controls" style="display:none;" id="controls">
+        <button onclick="showTemp()">🌡️ Temperatur</button>
+        <button onclick="showWind()">💨 Wind</button>
+        <hr style="border: none; border-top: 1px solid rgba(0,0,0,0.1); margin: 8px 0;">
+        <button class="strava-btn" onclick="document.getElementById('gpxFile').click()">📁 GPX laden</button>
+        <button class="test-btn" onclick="testTrack()">🧪 Test Track</button>
+        <button class="clear-btn" onclick="clearTrack()">❌ Löschen</button>
+        <div id="status">Bereit</div>
+    </div>
+    
+    <input type="file" id="gpxFile" accept=".gpx" style="display:none;" onchange="loadGPX(event)">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <script>
+        // ====== KONFIGURATION ======
+        const API_KEY = 'iQsDfJMVaqClrrwonH5ToWtqEiN19mIs';  // <-- HIER DEINEN WINDY API KEY EINFÜGEN!
+        
+        let windyAPI = null;
+        let trackLayer = null;
+        let markers = [];
+        
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+        
+        async function init() {
+            try {
+                console.log('📦 Lade Leaflet...');
+                await loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js');
+                
+                console.log('📦 Lade Windy...');
+                await loadScript('https://api.windy.com/assets/map-forecast/libBoot.js');
+                
+                console.log('🗺️ Initialisiere Karte...');
+                windyInit({
+                    key: API_KEY,
+                    lat: 47.3769,
+                    lon: 8.5417,
+                    zoom: 10
+                }, api => {
+                    windyAPI = api;
+                    api.store.set('overlay', 'temp');
+                    api.store.set('particlesAnim', 'on');
+                    
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('controls').style.display = 'block';
+                    setStatus('✅ Karte bereit');
+                });
+                
+            } catch (error) {
+                console.error('❌ Fehler:', error);
+                document.getElementById('loading').innerHTML = `
+                    <div style="color: #FF3B30;">❌ Fehler beim Laden</div>
+                    <div style="font-size: 12px; margin-top: 10px;">
+                        ${error.message}
+                    </div>
+                `;
+            }
+        }
+        
+        window.addEventListener('load', init);
+        
+        function showTemp() {
+            if (!windyAPI) return;
+            windyAPI.store.set('overlay', 'temp');
+            windyAPI.store.set('particlesAnim', 'on');
+            setStatus('🌡️ Temperatur');
+        }
+        
+        function showWind() {
+            if (!windyAPI) return;
+            windyAPI.store.set('overlay', 'wind');
+            windyAPI.store.set('particlesAnim', 'on');
+            setStatus('💨 Wind');
+        }
+        
+        function testTrack() {
+            if (!windyAPI) return;
+            
+            const coords = [
+                [47.3769, 8.5417],
+                [47.3800, 8.5450],
+                [47.3850, 8.5500],
+                [47.3900, 8.5550],
+                [47.3533, 8.4914]
+            ];
+            
+            displayTrack(coords, 'Test Route');
+        }
+        
+        function loadGPX(event) {
+            const file = event.target.files[0];
+            if (!file || !windyAPI) return;
+            
+            setStatus('⏳ Lade...');
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    parseGPX(e.target.result, file.name);
+                } catch (error) {
+                    setStatus('❌ ' + error.message);
+                    console.error(error);
+                }
+            };
+            reader.readAsText(file);
+        }
+        
+        function parseGPX(gpxString, filename) {
+            const parser = new DOMParser();
+            const xml = parser.parseFromString(gpxString, 'text/xml');
+            
+            let points = xml.querySelectorAll('trkpt');
+            if (points.length === 0) points = xml.querySelectorAll('rtept');
+            if (points.length === 0) points = xml.querySelectorAll('wpt');
+            
+            if (points.length === 0) {
+                throw new Error('Keine Trackpunkte gefunden');
+            }
+            
+            const coords = [];
+            points.forEach(pt => {
+                const lat = parseFloat(pt.getAttribute('lat'));
+                const lon = parseFloat(pt.getAttribute('lon'));
+                if (!isNaN(lat) && !isNaN(lon)) {
+                    coords.push([lat, lon]);
+                }
+            });
+            
+            if (coords.length === 0) {
+                throw new Error('Keine gültigen Koordinaten');
+            }
+            
+            displayTrack(coords, filename);
+        }
+        
+        function displayTrack(coords, name) {
+            clearTrack();
+            
+            trackLayer = L.polyline(coords, {
+                color: '#FC4C02',
+                weight: 4,
+                opacity: 0.9,
+                smoothFactor: 1
+            }).addTo(windyAPI.map);
+            
+            const start = L.circleMarker(coords[0], {
+                radius: 8,
+                fillColor: '#34C759',
+                color: 'white',
+                weight: 3,
+                fillOpacity: 1
+            }).addTo(windyAPI.map);
+            start.bindPopup('Start');
+            markers.push(start);
+            
+            const end = L.circleMarker(coords[coords.length - 1], {
+                radius: 8,
+                fillColor: '#FF3B30',
+                color: 'white',
+                weight: 3,
+                fillOpacity: 1
+            }).addTo(windyAPI.map);
+            end.bindPopup('Ziel');
+            markers.push(end);
+            
+            windyAPI.map.fitBounds(trackLayer.getBounds(), {
+                padding: [50, 50],
+                maxZoom: 14
+            });
+            
+            setStatus(`✅ ${coords.length} Punkte`);
+        }
+        
+        function clearTrack() {
+            if (trackLayer) {
+                windyAPI.map.removeLayer(trackLayer);
+                trackLayer = null;
+            }
+            markers.forEach(m => windyAPI.map.removeLayer(m));
+            markers = [];
+        }
+        
+        function setStatus(text) {
+            document.getElementById('status').textContent = text;
+        }
+    </script>
+</body>
+</html>
