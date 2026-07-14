@@ -10,6 +10,7 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             height: 100vh;
             overflow: hidden;
+            background: #f5f5f5;
         }
         
         #windy {
@@ -56,6 +57,7 @@
             background: rgba(0,0,0,0.05);
             border-radius: 5px;
             text-align: center;
+            word-wrap: break-word;
         }
         
         .loading {
@@ -64,11 +66,12 @@
             left: 50%;
             transform: translate(-50%, -50%);
             background: white;
-            padding: 30px;
+            padding: 30px 40px;
             border-radius: 15px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
             text-align: center;
             z-index: 2000;
+            min-width: 250px;
         }
         
         .spinner {
@@ -85,6 +88,15 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        .error-box {
+            background: #fff;
+            border-left: 4px solid #FF3B30;
+            padding: 15px;
+            margin-top: 10px;
+            font-size: 12px;
+            text-align: left;
+        }
     </style>
 </head>
 <body>
@@ -92,7 +104,8 @@
     
     <div class="loading" id="loading">
         <div class="spinner"></div>
-        <div>Lade Windy Karte...</div>
+        <div id="loadingText">Lade Windy Karte...</div>
+        <div id="errorDetails" style="display:none;" class="error-box"></div>
     </div>
     
     <div class="controls" style="display:none;" id="controls">
@@ -111,58 +124,114 @@
     
     <script>
         // ====== KONFIGURATION ======
-        const API_KEY = 'rAHes9bDoII5KhZ3T09KPY6EvC9qPQbr';  // <-- HIER DEINEN WINDY API KEY EINFÜGEN!
+        const API_KEY = 'PsL0NwhTtTcTFp0vLkAwGuitVs2KuQjt';  // <-- ERSETZE MIT DEINEM KEY!
         
         let windyAPI = null;
         let trackLayer = null;
         let markers = [];
         
+        function showError(title, details) {
+            document.getElementById('loadingText').innerHTML = `<span style="color: #FF3B30;">❌ ${title}</span>`;
+            const errorDiv = document.getElementById('errorDetails');
+            errorDiv.style.display = 'block';
+            errorDiv.innerHTML = `<strong>Details:</strong><br>${details}`;
+            console.error(title, details);
+        }
+        
         function loadScript(src) {
             return new Promise((resolve, reject) => {
+                console.log('Loading:', src);
                 const script = document.createElement('script');
                 script.src = src;
-                script.onload = resolve;
-                script.onerror = reject;
+                script.onload = () => {
+                    console.log('✅ Loaded:', src);
+                    resolve();
+                };
+                script.onerror = () => {
+                    console.error('❌ Failed:', src);
+                    reject(new Error(`Script load failed: ${src}`));
+                };
                 document.head.appendChild(script);
             });
         }
         
         async function init() {
             try {
-                console.log('📦 Lade Leaflet...');
+                // Schritt 1: Leaflet laden
+                document.getElementById('loadingText').textContent = 'Lade Leaflet...';
                 await loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js');
                 
-                console.log('📦 Lade Windy...');
+                if (typeof L === 'undefined') {
+                    throw new Error('Leaflet konnte nicht geladen werden');
+                }
+                console.log('✅ Leaflet loaded, version:', L.version);
+                
+                // Schritt 2: Windy laden
+                document.getElementById('loadingText').textContent = 'Lade Windy API...';
                 await loadScript('https://api.windy.com/assets/map-forecast/libBoot.js');
                 
-                console.log('🗺️ Initialisiere Karte...');
-                windyInit({
+                // Warte kurz
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                if (typeof windyInit === 'undefined') {
+                    throw new Error('windyInit ist nicht verfügbar. Mögliche Ursachen:<br>• API Key ungültig<br>• Domain nicht erlaubt<br>• Windy API down');
+                }
+                console.log('✅ windyInit available');
+                
+                // Schritt 3: Windy initialisieren
+                document.getElementById('loadingText').textContent = 'Initialisiere Karte...';
+                
+                const options = {
                     key: API_KEY,
                     lat: 47.3769,
                     lon: 8.5417,
                     zoom: 10
-                }, api => {
+                };
+                
+                windyInit(options, api => {
+                    console.log('✅ Windy callback triggered');
                     windyAPI = api;
+                    
+                    if (!api.map || !api.store) {
+                        throw new Error('Windy API unvollständig geladen');
+                    }
+                    
+                    // Setze Layers
                     api.store.set('overlay', 'temp');
                     api.store.set('particlesAnim', 'on');
                     
+                    // Zeige UI
                     document.getElementById('loading').style.display = 'none';
                     document.getElementById('controls').style.display = 'block';
+                    
                     setStatus('✅ Karte bereit');
+                    console.log('✅ Alles bereit!');
+                }, error => {
+                    console.error('Windy Init Error:', error);
+                    showError('Windy Initialisierung fehlgeschlagen', 
+                        'Prüfe deinen API Key und Domain-Settings:<br>' +
+                        '<a href="https://api.windy.com/keys" target="_blank">api.windy.com/keys</a>');
                 });
                 
             } catch (error) {
-                console.error('❌ Fehler:', error);
-                document.getElementById('loading').innerHTML = `
-                    <div style="color: #FF3B30;">❌ Fehler beim Laden</div>
-                    <div style="font-size: 12px; margin-top: 10px;">
-                        ${error.message}
-                    </div>
-                `;
+                console.error('Init Error:', error);
+                showError('Fehler beim Laden', error.message);
             }
         }
         
-        window.addEventListener('load', init);
+        window.addEventListener('load', () => {
+            console.log('Page loaded, starting init...');
+            init();
+        });
+        
+        // Globale Error Handler
+        window.addEventListener('error', (e) => {
+            console.error('Global error:', e.message);
+        });
+        
+        window.addEventListener('unhandledrejection', (e) => {
+            console.error('Unhandled promise rejection:', e.reason);
+        });
         
         function showTemp() {
             if (!windyAPI) return;
@@ -179,7 +248,10 @@
         }
         
         function testTrack() {
-            if (!windyAPI) return;
+            if (!windyAPI) {
+                setStatus('❌ Karte nicht geladen');
+                return;
+            }
             
             const coords = [
                 [47.3769, 8.5417],
@@ -196,7 +268,7 @@
             const file = event.target.files[0];
             if (!file || !windyAPI) return;
             
-            setStatus('⏳ Lade...');
+            setStatus('⏳ Lade ' + file.name + '...');
             
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -206,6 +278,9 @@
                     setStatus('❌ ' + error.message);
                     console.error(error);
                 }
+            };
+            reader.onerror = () => {
+                setStatus('❌ Datei konnte nicht gelesen werden');
             };
             reader.readAsText(file);
         }
@@ -283,6 +358,7 @@
             }
             markers.forEach(m => windyAPI.map.removeLayer(m));
             markers = [];
+            setStatus('Track gelöscht');
         }
         
         function setStatus(text) {
