@@ -459,7 +459,8 @@ async function exportImage() {
                 latlngs.forEach((latlng, index) => {
                     const point = windyAPI.map.latLngToContainerPoint(latlng);
                     const mapRect = windyAPI.map.getContainer().getBoundingClientRect();
-                    const x = (point.x - (frameRect.left - mapRect.left)) * scale;
+                const viewportX = point.x + mapRect.left - frameRect.left;
+const x = viewportX * scaleX;
                     const y = (point.y - (frameRect.top - mapRect.top)) * scale;
                     
                     if (index === 0) {
