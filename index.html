@@ -443,61 +443,74 @@ async function exportImage() {
             0, 0, finalCanvas.width, finalCanvas.height
         );
         
-        // ZEICHNE Track manuell
-        if (trackLayer) {
-            const latlngs = trackLayer.getLatLngs();
+        // ZEICHNE Track manuell - KORRIGIERTE Version
+if (trackLayer) {
+    const latlngs = trackLayer.getLatLngs();
+    
+    if (latlngs.length > 0) {
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 10;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.globalAlpha = 0.95;
+        
+        ctx.beginPath();
+        
+        const mapRect = windyAPI.map.getContainer().getBoundingClientRect();
+        const scaleX = finalCanvas.width / frameRect.width;
+        const scaleY = finalCanvas.height / frameRect.height;
+        
+        latlngs.forEach((latlng, index) => {
+            // Pixel-Position in der Map
+            const point = windyAPI.map.latLngToContainerPoint(latlng);
             
-            if (latlngs.length > 0) {
-                ctx.strokeStyle = '#FFFFFF';
-                ctx.lineWidth = 10;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                ctx.globalAlpha = 0.95;
-                
-                ctx.beginPath();
-                
-                latlngs.forEach((latlng, index) => {
-                    const point = windyAPI.map.latLngToContainerPoint(latlng);
-                    const mapRect = windyAPI.map.getContainer().getBoundingClientRect();
-                const viewportX = point.x + mapRect.left - frameRect.left;
-const x = viewportX * scaleX;
-                    const y = (point.y - (frameRect.top - mapRect.top)) * scale;
-                    
-                    if (index === 0) {
-                        ctx.moveTo(x, y);
-                    } else {
-                        ctx.lineTo(x, y);
-                    }
-                });
-                
-                ctx.stroke();
-                ctx.globalAlpha = 1.0;
-                
-                // Marker
-                const start = latlngs[0];
-                const end = latlngs[latlngs.length - 1];
-                
-                const drawMarker = (latlng, color) => {
-                    const point = windyAPI.map.latLngToContainerPoint(latlng);
-                    const mapRect = windyAPI.map.getContainer().getBoundingClientRect();
-                    const x = (point.x - (frameRect.left - mapRect.left)) * scale;
-                    const y = (point.y - (frameRect.top - mapRect.top)) * scale;
-                    
-                    ctx.beginPath();
-                    ctx.arc(x, y, 16, 0, Math.PI * 2);
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.fill();
-                    
-                    ctx.beginPath();
-                    ctx.arc(x, y, 11, 0, Math.PI * 2);
-                    ctx.fillStyle = color;
-                    ctx.fill();
-                };
-                
-                drawMarker(start, '#34C759');
-                drawMarker(end, '#FF3B30');
+            // Position relativ zum Frame (im Viewport)
+            const viewportX = point.x + mapRect.left - frameRect.left;
+            const viewportY = point.y + mapRect.top - frameRect.top;
+            
+            // Skalierung auf finalen Canvas
+            const x = viewportX * scaleX;
+            const y = viewportY * scaleY;
+            
+            if (index === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
             }
-        }
+        });
+        
+        ctx.stroke();
+        ctx.globalAlpha = 1.0;
+        
+        // Marker
+        const start = latlngs[0];
+        const end = latlngs[latlngs.length - 1];
+        
+        const drawMarker = (latlng, color) => {
+            const point = windyAPI.map.latLngToContainerPoint(latlng);
+            const viewportX = point.x + mapRect.left - frameRect.left;
+            const viewportY = point.y + mapRect.top - frameRect.top;
+            const x = viewportX * scaleX;
+            const y = viewportY * scaleY;
+            
+            // Weißer Rand
+            ctx.beginPath();
+            ctx.arc(x, y, 16, 0, Math.PI * 2);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fill();
+            
+            // Farbiger Kreis
+            ctx.beginPath();
+            ctx.arc(x, y, 11, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+        };
+        
+        drawMarker(start, '#34C759');
+        drawMarker(end, '#FF3B30');
+    }
+}
+
         
         // EXIF etc. (bleibt gleich)
         const jpegDataUrl = finalCanvas.toDataURL('image/jpeg', 0.95);
