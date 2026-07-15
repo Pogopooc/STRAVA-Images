@@ -324,6 +324,69 @@
         // GPX Metadaten
         let gpxStartTimestamp = null;
         let gpxMiddleCoords = null; // [lat, lon]
+
+// ====== KONFIGURATION FÜR DESKTOP & MOBILE ======
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
+
+const CONFIG = {
+    desktop: {
+        textTopY: 60,
+        textBottomY: -120,
+        textTopSize: 90,
+        textBottomSize: 90,
+        maxZoom: 14
+    },
+    mobile: {
+        textTopY: 40,
+        textBottomY: -80,
+        textTopSize: 70,
+        textBottomSize: 70,
+        maxZoom: 13
+    }
+};
+
+const settings = isMobile ? CONFIG.mobile : CONFIG.desktop;
+
+// ====== ANGEPASSTE displayTrack mitDevice-spezifischem Zoom ======
+function displayTrack(coords) {
+    clearTrack();
+    
+    trackLayer = L.polyline(coords, {
+        color: '#FFFFFF',
+        weight: 5,
+        opacity: 0.95,
+        smoothFactor: 1,
+        lineCap: 'round',
+        lineJoin: 'round'
+    }).addTo(windyAPI.map);
+    
+    const start = L.circleMarker(coords[0], {
+        radius: 8,
+        fillColor: '#34C759',
+        color: 'white',
+        weight: 3,
+        fillOpacity: 1
+    }).addTo(windyAPI.map);
+    markers.push(start);
+    
+    const end = L.circleMarker(coords[coords.length - 1], {
+        radius: 8,
+        fillColor: '#FF3B30',
+        color: 'white',
+        weight: 3,
+        fillOpacity: 1
+    }).addTo(windyAPI.map);
+    markers.push(end);
+    
+    // Device-spezifischer Zoom
+    windyAPI.map.fitBounds(trackLayer.getBounds(), {
+        paddingTopLeft: [50, 80],
+        paddingBottomRight: [50, 80],
+        maxZoom: settings.maxZoom
+    });
+}
+
+
         
         function initWindy() {
             if (typeof windyInit === 'undefined') {
@@ -377,7 +440,7 @@
             btn.textContent = memeTextVisible ? 'Text ✓' : 'Text';
         }
         
-// ====== EXPORT mit verstecktem Original-Track ======
+// ====== VERBESSERTER EXPORT: Track UNTER Text ======
 async function exportImage() {
     if (!windyAPI) {
         alert('Karte noch nicht geladen!');
@@ -394,14 +457,27 @@ async function exportImage() {
     const frame = document.getElementById('screenshotFrame');
     const controls = document.getElementById('controls');
     const toggle = document.getElementById('controlsToggle');
+    const gridOverlay = document.getElementById('gridOverlay');
     
     const wasVisible = controlsVisible;
+    
+    // Verstecke UI-Elemente
     if (wasVisible) {
         controls.style.display = 'none';
         toggle.style.display = 'none';
     }
     
-    // VERSTECKE Original-Track und Marker temporär
+    // Verstecke Text, Grid und Track temporär
+    const topText = document.getElementById('topText');
+    const bottomText = document.getElementById('bottomText');
+    const topTextWasVisible = topText.style.display !== 'none';
+    const bottomTextWasVisible = bottomText.style.display !== 'none';
+    const gridWasVisible = gridOverlay.style.display !== 'none';
+    
+    topText.style.display = 'none';
+    bottomText.style.display = 'none';
+    gridOverlay.style.display = 'none';
+    
     const trackWasVisible = windyAPI.map.hasLayer(trackLayer);
     if (trackWasVisible) {
         windyAPI.map.removeLayer(trackLayer);
@@ -420,7 +496,7 @@ async function exportImage() {
     try {
         const frameRect = frame.getBoundingClientRect();
         
-        // Screenshot
+        // Screenshot nur der Karte (ohne Text, Grid, Track)
         const canvas = await html2canvas(document.body, {
             useCORS: true,
             allowTaint: true,
@@ -443,74 +519,126 @@ async function exportImage() {
             0, 0, finalCanvas.width, finalCanvas.height
         );
         
-        // ZEICHNE Track manuell - KORRIGIERTE Version
-if (trackLayer) {
-    const latlngs = trackLayer.getLatLngs();
-    
-    if (latlngs.length > 0) {
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 10;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.globalAlpha = 0.95;
-        
-        ctx.beginPath();
-        
-        const mapRect = windyAPI.map.getContainer().getBoundingClientRect();
-        const scaleX = finalCanvas.width / frameRect.width;
-        const scaleY = finalCanvas.height / frameRect.height;
-        
-        latlngs.forEach((latlng, index) => {
-            // Pixel-Position in der Map
-            const point = windyAPI.map.latLngToContainerPoint(latlng);
+        // 1. ZEICHNE GPX-TRACK (unter allem)
+        if (trackLayer) {
+            const latlngs = trackLayer.getLatLngs();
             
-            // Position relativ zum Frame (im Viewport)
-            const viewportX = point.x + mapRect.left - frameRect.left;
-            const viewportY = point.y + mapRect.top - frameRect.top;
-            
-            // Skalierung auf finalen Canvas
-            const x = viewportX * scaleX;
-            const y = viewportY * scaleY;
-            
-            if (index === 0) {
-                ctx.moveTo(x, y);
-            } else {
-                ctx.lineTo(x, y);
+            if (latlngs.length > 0) {
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 10;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.globalAlpha = 0.95;
+                
+                ctx.beginPath();
+                
+                const mapRect = windyAPI.map.getContainer().getBoundingClientRect();
+                const scaleX = finalCanvas.width / frameRect.width;
+                const scaleY = finalCanvas.height / frameRect.height;
+                
+                latlngs.forEach((latlng, index) => {
+                    const point = windyAPI.map.latLngToContainerPoint(latlng);
+                    const viewportX = point.x + mapRect.left - frameRect.left;
+                    const viewportY = point.y + mapRect.top - frameRect.top;
+                    const x = viewportX * scaleX;
+                    const y = viewportY * scaleY;
+                    
+                    if (index === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                });
+                
+                ctx.stroke();
+                ctx.globalAlpha = 1.0;
+                
+                // Marker
+                const start = latlngs[0];
+                const end = latlngs[latlngs.length - 1];
+                
+                const drawMarker = (latlng, color) => {
+                    const point = windyAPI.map.latLngToContainerPoint(latlng);
+                    const viewportX = point.x + mapRect.left - frameRect.left;
+                    const viewportY = point.y + mapRect.top - frameRect.top;
+                    const x = viewportX * scaleX;
+                    const y = viewportY * scaleY;
+                    
+                    ctx.beginPath();
+                    ctx.arc(x, y, 16, 0, Math.PI * 2);
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fill();
+                    
+                    ctx.beginPath();
+                    ctx.arc(x, y, 11, 0, Math.PI * 2);
+                    ctx.fillStyle = color;
+                    ctx.fill();
+                };
+                
+                drawMarker(start, '#34C759');
+                drawMarker(end, '#FF3B30');
             }
-        });
+        }
         
-        ctx.stroke();
-        ctx.globalAlpha = 1.0;
-        
-        // Marker
-        const start = latlngs[0];
-        const end = latlngs[latlngs.length - 1];
-        
-        const drawMarker = (latlng, color) => {
-            const point = windyAPI.map.latLngToContainerPoint(latlng);
-            const viewportX = point.x + mapRect.left - frameRect.left;
-            const viewportY = point.y + mapRect.top - frameRect.top;
-            const x = viewportX * scaleX;
-            const y = viewportY * scaleY;
+        // 2. ZEICHNE GRID (über Track)
+        if (gridWasVisible) {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.lineWidth = 2;
             
-            // Weißer Rand
-            ctx.beginPath();
-            ctx.arc(x, y, 16, 0, Math.PI * 2);
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fill();
+            const grid = document.getElementById('gridOverlay');
+            let gridSize = 40;
             
-            // Farbiger Kreis
-            ctx.beginPath();
-            ctx.arc(x, y, 11, 0, Math.PI * 2);
-            ctx.fillStyle = color;
-            ctx.fill();
-        };
+            if (grid.classList.contains('fine')) {
+                gridSize = 20;
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+            } else if (grid.classList.contains('contour')) {
+                for (let y = 0; y < finalCanvas.height; y += 30) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(finalCanvas.width, y);
+                    ctx.stroke();
+                }
+            } else {
+                for (let x = 0; x < finalCanvas.width; x += gridSize) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, finalCanvas.height);
+                    ctx.stroke();
+                }
+                
+                for (let y = 0; y < finalCanvas.height; y += gridSize) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(finalCanvas.width, y);
+                    ctx.stroke();
+                }
+            }
+        }
         
-        drawMarker(start, '#34C759');
-        drawMarker(end, '#FF3B30');
-    }
-}
-
+        // 3. ZEICHNE TEXT (ganz oben) - Device-spezifische Größe
+        if (memeTextVisible && (topTextWasVisible || bottomTextWasVisible)) {
+            ctx.font = `900 ${settings.textTopSize}px Anton, Impact`;
+            ctx.textAlign = 'center';
+            ctx.fillStyle = 'white';
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 8;
+            ctx.lineJoin = 'round';
+            
+            const topTextValue = document.getElementById('inputTopText').value.toUpperCase();
+            if (topTextValue && topTextWasVisible) {
+                const y = settings.textTopY;
+                ctx.strokeText(topTextValue, finalCanvas.width / 2, y);
+                ctx.fillText(topTextValue, finalCanvas.width / 2, y);
+            }
+            
+            ctx.font = `900 ${settings.textBottomSize}px Anton, Impact`;
+            const bottomTextValue = document.getElementById('inputBottomText').value.toUpperCase();
+            if (bottomTextValue && bottomTextWasVisible) {
+                const y = finalCanvas.height + settings.textBottomY;
+                ctx.strokeText(bottomTextValue, finalCanvas.width / 2, y);
+                ctx.fillText(bottomTextValue, finalCanvas.width / 2, y);
+            }
+        }
         
         // EXIF etc. (bleibt gleich)
         const jpegDataUrl = finalCanvas.toDataURL('image/jpeg', 0.95);
@@ -572,9 +700,9 @@ if (trackLayer) {
                 String(now.getMinutes()).padStart(2, '0');
         }
         
-        const topText = document.getElementById('inputTopText').value.trim();
-        if (topText) {
-            const cleanText = topText.substring(0, 30).replace(/[^a-zA-Z0-9äöüÄÖÜ\s]/g, '').trim();
+        const topTextVal = document.getElementById('inputTopText').value.trim();
+        if (topTextVal) {
+            const cleanText = topTextVal.substring(0, 30).replace(/[^a-zA-Z0-9äöüÄÖÜ\s]/g, '').trim();
             filename += `-${cleanText}`;
         }
         
@@ -589,7 +717,11 @@ if (trackLayer) {
         setStatus('❌ Fehler: ' + error.message);
     }
     
-    // ZEIGE Track wieder an
+    // Zeige alles wieder an
+    if (topTextWasVisible) topText.style.display = 'block';
+    if (bottomTextWasVisible) bottomText.style.display = 'block';
+    if (gridWasVisible) gridOverlay.style.display = 'block';
+    
     if (trackWasVisible) {
         windyAPI.map.addLayer(trackLayer);
     }
@@ -602,6 +734,7 @@ if (trackLayer) {
         toggle.style.display = 'flex';
     }
 }
+
 
 
         
