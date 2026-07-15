@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Strava Wetter">
     <title>Windy + GPX Meme Creator</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Anton&display=swap');
@@ -106,13 +109,13 @@
         }
         
         #topText {
-            top: 15px;
+            top: 30px;
             font-size: 45px;
             line-height: 1.1;
         }
         
         #bottomText {
-            bottom: 15px;
+            bottom: 30px;
             font-size: 45px;
             line-height: 1.1;
         }
@@ -202,6 +205,7 @@
         .clear-btn { background: #FF3B30; }
         .test-btn { background: #34C759; }
         .export-btn { background: #FF2D55; font-size: 14px; font-weight: 700; }
+        .settings-btn { background: #8E8E93; font-size: 10px; }
         
         .toggle-group {
             display: flex;
@@ -298,6 +302,11 @@
         <button class="test-btn" onclick="testTrack()">🧪 Test</button>
         <button class="clear-btn" onclick="clearTrack()">❌ Löschen</button>
         
+        <hr style="border: none; border-top: 1px solid rgba(0,0,0,0.1); margin: 6px 0;">
+        
+        <div class="section-title">⚙️ Einstellungen</div>
+        <button class="settings-btn" onclick="resetAPIKey()">🔑 API Key löschen</button>
+        
         <div id="status">Bereit</div>
     </div>
     
@@ -310,7 +319,26 @@
     <script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.min.js"></script>
     
     <script>
-        const API_KEY = 'rAHes9bDoII5KhZ3T09KPY6EvC9qPQbr';
+        // ====== API KEY aus URL oder localStorage ======
+        function getAPIKey() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const keyFromURL = urlParams.get('key');
+            
+            if (keyFromURL) {
+                localStorage.setItem('windy_api_key', keyFromURL);
+                window.history.replaceState({}, document.title, window.location.pathname);
+                return keyFromURL;
+            }
+            
+            const savedKey = localStorage.getItem('windy_api_key');
+            if (savedKey) {
+                return savedKey;
+            }
+            
+            return null;
+        }
+        
+        const API_KEY = getAPIKey();
         
         let windyAPI = null;
         let trackLayer = null;
@@ -321,74 +349,40 @@
         let gridVisible = true;
         let controlsVisible = true;
         
-        // GPX Metadaten
         let gpxStartTimestamp = null;
-        let gpxMiddleCoords = null; // [lat, lon]
-
-// ====== KONFIGURATION FÜR DESKTOP & MOBILE ======
-const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
-
-const CONFIG = {
-    desktop: {
-        textTopY: 100, // <- +40
-        textBottomY: -50, // <- -20
-        textTopSize: 75,
-        textBottomSize: 75,
-        maxZoom: 12 // <- -1
-    },
-    mobile: {
-        textTopY: 100, // <- +40
-        textBottomY: -50, // <- -20
-        textTopSize: 70,
-        textBottomSize: 70,
-        maxZoom: 13 // <- -1
-    }
-};
-
-const settings = isMobile ? CONFIG.mobile : CONFIG.desktop;
-
-// ====== ANGEPASSTE displayTrack mitDevice-spezifischem Zoom ======
-function displayTrack(coords) {
-    clearTrack();
-    
-    trackLayer = L.polyline(coords, {
-        color: '#FFFFFF',
-        weight: 5,
-        opacity: 0.95,
-        smoothFactor: 1,
-        lineCap: 'round',
-        lineJoin: 'round'
-    }).addTo(windyAPI.map);
-    
-    const start = L.circleMarker(coords[0], {
-        radius: 8,
-        fillColor: '#34C759',
-        color: 'white',
-        weight: 3,
-        fillOpacity: 1
-    }).addTo(windyAPI.map);
-    markers.push(start);
-    
-    const end = L.circleMarker(coords[coords.length - 1], {
-        radius: 8,
-        fillColor: '#FF3B30',
-        color: 'white',
-        weight: 3,
-        fillOpacity: 1
-    }).addTo(windyAPI.map);
-    markers.push(end);
-    
-    // Device-spezifischer Zoom
-    windyAPI.map.fitBounds(trackLayer.getBounds(), {
-        paddingTopLeft: [50, 80],
-        paddingBottomRight: [50, 80],
-        maxZoom: settings.maxZoom
-    });
-}
-
-
+        let gpxMiddleCoords = null;
         
+        // ====== KONFIGURATION FÜR DESKTOP & MOBILE ======
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
+        
+        const CONFIG = {
+            desktop: {
+                textTopY: 100,
+                textBottomY: -50,
+                textTopSize: 75,
+                textBottomSize: 75,
+                maxZoom: 12
+            },
+            mobile: {
+                textTopY: 100,
+                textBottomY: -50,
+                textTopSize: 70,
+                textBottomSize: 70,
+                maxZoom: 13
+            }
+        };
+        
+        const settings = isMobile ? CONFIG.mobile : CONFIG.desktop;
+        
+        // ====== INIT ======
         function initWindy() {
+            if (!API_KEY) {
+                alert('⚠️ Kein API Key gefunden!\n\nÖffne die App mit:\n?key=DEIN_API_KEY');
+                document.getElementById('controls').style.display = 'block';
+                setStatus('❌ API Key fehlt');
+                return;
+            }
+            
             if (typeof windyInit === 'undefined') {
                 alert('Windy konnte nicht geladen werden.');
                 return;
@@ -440,310 +434,301 @@ function displayTrack(coords) {
             btn.textContent = memeTextVisible ? 'Text ✓' : 'Text';
         }
         
-// ====== VERBESSERTER EXPORT: Track UNTER Text ======
-async function exportImage() {
-    if (!windyAPI) {
-        alert('Karte noch nicht geladen!');
-        return;
-    }
-    
-    if (!trackLayer) {
-        alert('Bitte erst GPX laden!');
-        return;
-    }
-    
-    setStatus('📸 Erstelle Bild...');
-    
-    const frame = document.getElementById('screenshotFrame');
-    const controls = document.getElementById('controls');
-    const toggle = document.getElementById('controlsToggle');
-    const gridOverlay = document.getElementById('gridOverlay');
-    
-    const wasVisible = controlsVisible;
-    
-    // Verstecke UI-Elemente
-    if (wasVisible) {
-        controls.style.display = 'none';
-        toggle.style.display = 'none';
-    }
-    
-    // Verstecke Text, Grid und Track temporär
-    const topText = document.getElementById('topText');
-    const bottomText = document.getElementById('bottomText');
-    const topTextWasVisible = topText.style.display !== 'none';
-    const bottomTextWasVisible = bottomText.style.display !== 'none';
-    const gridWasVisible = gridOverlay.style.display !== 'none';
-    
-    topText.style.display = 'none';
-    bottomText.style.display = 'none';
-    gridOverlay.style.display = 'none';
-    
-    const trackWasVisible = windyAPI.map.hasLayer(trackLayer);
-    if (trackWasVisible) {
-        windyAPI.map.removeLayer(trackLayer);
-    }
-    
-    const visibleMarkers = [];
-    markers.forEach(marker => {
-        if (windyAPI.map.hasLayer(marker)) {
-            visibleMarkers.push(marker);
-            windyAPI.map.removeLayer(marker);
-        }
-    });
-    
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    try {
-        const frameRect = frame.getBoundingClientRect();
-        
-        // Screenshot nur der Karte (ohne Text, Grid, Track)
-        const canvas = await html2canvas(document.body, {
-            useCORS: true,
-            allowTaint: true,
-            foreignObjectRendering: false,
-            backgroundColor: '#000000',
-            scale: 2,
-            logging: false
-        });
-        
-        const finalCanvas = document.createElement('canvas');
-        finalCanvas.width = 540 * 2;
-        finalCanvas.height = 368 * 2;
-        const ctx = finalCanvas.getContext('2d');
-        
-        const scale = 2;
-        ctx.drawImage(
-            canvas,
-            frameRect.left * scale, frameRect.top * scale,
-            frameRect.width * scale, frameRect.height * scale,
-            0, 0, finalCanvas.width, finalCanvas.height
-        );
-        
-        // 1. ZEICHNE GPX-TRACK (unter allem)
-        if (trackLayer) {
-            const latlngs = trackLayer.getLatLngs();
+        // ====== EXPORT ======
+        async function exportImage() {
+            if (!windyAPI) {
+                alert('Karte noch nicht geladen!');
+                return;
+            }
             
-            if (latlngs.length > 0) {
-                ctx.strokeStyle = '#FFFFFF';
-                ctx.lineWidth = 10;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                ctx.globalAlpha = 0.95;
+            if (!trackLayer) {
+                alert('Bitte erst GPX laden!');
+                return;
+            }
+            
+            setStatus('📸 Erstelle Bild...');
+            
+            const frame = document.getElementById('screenshotFrame');
+            const controls = document.getElementById('controls');
+            const toggle = document.getElementById('controlsToggle');
+            const gridOverlay = document.getElementById('gridOverlay');
+            
+            const wasVisible = controlsVisible;
+            
+            if (wasVisible) {
+                controls.style.display = 'none';
+                toggle.style.display = 'none';
+            }
+            
+            const topText = document.getElementById('topText');
+            const bottomText = document.getElementById('bottomText');
+            const topTextWasVisible = topText.style.display !== 'none';
+            const bottomTextWasVisible = bottomText.style.display !== 'none';
+            const gridWasVisible = gridOverlay.style.display !== 'none';
+            
+            topText.style.display = 'none';
+            bottomText.style.display = 'none';
+            gridOverlay.style.display = 'none';
+            
+            const trackWasVisible = windyAPI.map.hasLayer(trackLayer);
+            if (trackWasVisible) {
+                windyAPI.map.removeLayer(trackLayer);
+            }
+            
+            const visibleMarkers = [];
+            markers.forEach(marker => {
+                if (windyAPI.map.hasLayer(marker)) {
+                    visibleMarkers.push(marker);
+                    windyAPI.map.removeLayer(marker);
+                }
+            });
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            try {
+                const frameRect = frame.getBoundingClientRect();
                 
-                ctx.beginPath();
-                
-                const mapRect = windyAPI.map.getContainer().getBoundingClientRect();
-                const scaleX = finalCanvas.width / frameRect.width;
-                const scaleY = finalCanvas.height / frameRect.height;
-                
-                latlngs.forEach((latlng, index) => {
-                    const point = windyAPI.map.latLngToContainerPoint(latlng);
-                    const viewportX = point.x + mapRect.left - frameRect.left;
-                    const viewportY = point.y + mapRect.top - frameRect.top;
-                    const x = viewportX * scaleX;
-                    const y = viewportY * scaleY;
-                    
-                    if (index === 0) {
-                        ctx.moveTo(x, y);
-                    } else {
-                        ctx.lineTo(x, y);
-                    }
+                const canvas = await html2canvas(document.body, {
+                    useCORS: true,
+                    allowTaint: true,
+                    foreignObjectRendering: false,
+                    backgroundColor: '#000000',
+                    scale: 2,
+                    logging: false
                 });
                 
-                ctx.stroke();
-                ctx.globalAlpha = 1.0;
+                const finalCanvas = document.createElement('canvas');
+                finalCanvas.width = 540 * 2;
+                finalCanvas.height = 368 * 2;
+                const ctx = finalCanvas.getContext('2d');
                 
-                // Marker
-                const start = latlngs[0];
-                const end = latlngs[latlngs.length - 1];
+                const scale = 2;
+                ctx.drawImage(
+                    canvas,
+                    frameRect.left * scale, frameRect.top * scale,
+                    frameRect.width * scale, frameRect.height * scale,
+                    0, 0, finalCanvas.width, finalCanvas.height
+                );
                 
-                const drawMarker = (latlng, color) => {
-                    const point = windyAPI.map.latLngToContainerPoint(latlng);
-                    const viewportX = point.x + mapRect.left - frameRect.left;
-                    const viewportY = point.y + mapRect.top - frameRect.top;
-                    const x = viewportX * scaleX;
-                    const y = viewportY * scaleY;
+                // ZEICHNE TRACK
+                if (trackLayer) {
+                    const latlngs = trackLayer.getLatLngs();
                     
-                    ctx.beginPath();
-                    ctx.arc(x, y, 16, 0, Math.PI * 2);
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.fill();
+                    if (latlngs.length > 0) {
+                        ctx.strokeStyle = '#FFFFFF';
+                        ctx.lineWidth = 10;
+                        ctx.lineCap = 'round';
+                        ctx.lineJoin = 'round';
+                        ctx.globalAlpha = 0.95;
+                        
+                        ctx.beginPath();
+                        
+                        const mapRect = windyAPI.map.getContainer().getBoundingClientRect();
+                        const scaleX = finalCanvas.width / frameRect.width;
+                        const scaleY = finalCanvas.height / frameRect.height;
+                        
+                        latlngs.forEach((latlng, index) => {
+                            const point = windyAPI.map.latLngToContainerPoint(latlng);
+                            const viewportX = point.x + mapRect.left - frameRect.left;
+                            const viewportY = point.y + mapRect.top - frameRect.top;
+                            const x = viewportX * scaleX;
+                            const y = viewportY * scaleY;
+                            
+                            if (index === 0) {
+                                ctx.moveTo(x, y);
+                            } else {
+                                ctx.lineTo(x, y);
+                            }
+                        });
+                        
+                        ctx.stroke();
+                        ctx.globalAlpha = 1.0;
+                        
+                        const start = latlngs[0];
+                        const end = latlngs[latlngs.length - 1];
+                        
+                        const drawMarker = (latlng, color) => {
+                            const point = windyAPI.map.latLngToContainerPoint(latlng);
+                            const viewportX = point.x + mapRect.left - frameRect.left;
+                            const viewportY = point.y + mapRect.top - frameRect.top;
+                            const x = viewportX * scaleX;
+                            const y = viewportY * scaleY;
+                            
+                            ctx.beginPath();
+                            ctx.arc(x, y, 16, 0, Math.PI * 2);
+                            ctx.fillStyle = '#FFFFFF';
+                            ctx.fill();
+                            
+                            ctx.beginPath();
+                            ctx.arc(x, y, 11, 0, Math.PI * 2);
+                            ctx.fillStyle = color;
+                            ctx.fill();
+                        };
+                        
+                        drawMarker(start, '#34C759');
+                        drawMarker(end, '#FF3B30');
+                    }
+                }
+                
+                // ZEICHNE GRID
+                if (gridWasVisible) {
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                    ctx.lineWidth = 2;
                     
-                    ctx.beginPath();
-                    ctx.arc(x, y, 11, 0, Math.PI * 2);
-                    ctx.fillStyle = color;
-                    ctx.fill();
-                };
-                
-                drawMarker(start, '#34C759');
-                drawMarker(end, '#FF3B30');
-            }
-        }
-        
-        // 2. ZEICHNE GRID (über Track)
-        if (gridWasVisible) {
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-            ctx.lineWidth = 2;
-            
-            const grid = document.getElementById('gridOverlay');
-            let gridSize = 40;
-            
-            if (grid.classList.contains('fine')) {
-                gridSize = 20;
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-            } else if (grid.classList.contains('contour')) {
-                for (let y = 0; y < finalCanvas.height; y += 30) {
-                    ctx.beginPath();
-                    ctx.moveTo(0, y);
-                    ctx.lineTo(finalCanvas.width, y);
-                    ctx.stroke();
-                }
-            } else {
-                for (let x = 0; x < finalCanvas.width; x += gridSize) {
-                    ctx.beginPath();
-                    ctx.moveTo(x, 0);
-                    ctx.lineTo(x, finalCanvas.height);
-                    ctx.stroke();
+                    const grid = document.getElementById('gridOverlay');
+                    let gridSize = 40;
+                    
+                    if (grid.classList.contains('fine')) {
+                        gridSize = 20;
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+                    } else if (grid.classList.contains('contour')) {
+                        for (let y = 0; y < finalCanvas.height; y += 30) {
+                            ctx.beginPath();
+                            ctx.moveTo(0, y);
+                            ctx.lineTo(finalCanvas.width, y);
+                            ctx.stroke();
+                        }
+                    } else {
+                        for (let x = 0; x < finalCanvas.width; x += gridSize) {
+                            ctx.beginPath();
+                            ctx.moveTo(x, 0);
+                            ctx.lineTo(x, finalCanvas.height);
+                            ctx.stroke();
+                        }
+                        
+                        for (let y = 0; y < finalCanvas.height; y += gridSize) {
+                            ctx.beginPath();
+                            ctx.moveTo(0, y);
+                            ctx.lineTo(finalCanvas.width, y);
+                            ctx.stroke();
+                        }
+                    }
                 }
                 
-                for (let y = 0; y < finalCanvas.height; y += gridSize) {
-                    ctx.beginPath();
-                    ctx.moveTo(0, y);
-                    ctx.lineTo(finalCanvas.width, y);
-                    ctx.stroke();
+                // ZEICHNE TEXT
+                if (memeTextVisible && (topTextWasVisible || bottomTextWasVisible)) {
+                    ctx.font = `900 ${settings.textTopSize}px Anton, Impact`;
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = 'white';
+                    ctx.strokeStyle = 'black';
+                    ctx.lineWidth = 8;
+                    ctx.lineJoin = 'round';
+                    
+                    const topTextValue = document.getElementById('inputTopText').value.toUpperCase();
+                    if (topTextValue && topTextWasVisible) {
+                        const y = settings.textTopY;
+                        ctx.strokeText(topTextValue, finalCanvas.width / 2, y);
+                        ctx.fillText(topTextValue, finalCanvas.width / 2, y);
+                    }
+                    
+                    ctx.font = `900 ${settings.textBottomSize}px Anton, Impact`;
+                    const bottomTextValue = document.getElementById('inputBottomText').value.toUpperCase();
+                    if (bottomTextValue && bottomTextWasVisible) {
+                        const y = finalCanvas.height + settings.textBottomY;
+                        ctx.strokeText(bottomTextValue, finalCanvas.width / 2, y);
+                        ctx.fillText(bottomTextValue, finalCanvas.width / 2, y);
+                    }
                 }
+                
+                // EXIF
+                const jpegDataUrl = finalCanvas.toDataURL('image/jpeg', 0.95);
+                
+                let exifObj = {};
+                
+                if (gpxStartTimestamp) {
+                    const date = new Date(gpxStartTimestamp);
+                    const exifDate = date.getFullYear() + ':' +
+                        String(date.getMonth() + 1).padStart(2, '0') + ':' +
+                        String(date.getDate()).padStart(2, '0') + ' ' +
+                        String(date.getHours()).padStart(2, '0') + ':' +
+                        String(date.getMinutes()).padStart(2, '0') + ':' +
+                        String(date.getSeconds()).padStart(2, '0');
+                    
+                    exifObj['0th'] = {};
+                    exifObj['0th'][piexif.ImageIFD.DateTime] = exifDate;
+                    exifObj['0th'][piexif.ImageIFD.Software] = 'Windy GPX Creator';
+                    
+                    exifObj['Exif'] = {};
+                    exifObj['Exif'][piexif.ExifIFD.DateTimeOriginal] = exifDate;
+                    exifObj['Exif'][piexif.ExifIFD.DateTimeDigitized] = exifDate;
+                }
+                
+                if (gpxMiddleCoords) {
+                    const lat = gpxMiddleCoords[0];
+                    const lon = gpxMiddleCoords[1];
+                    
+                    exifObj['GPS'] = {};
+                    exifObj['GPS'][piexif.GPSIFD.GPSLatitudeRef] = lat >= 0 ? 'N' : 'S';
+                    exifObj['GPS'][piexif.GPSIFD.GPSLatitude] = degToDmsRational(Math.abs(lat));
+                    exifObj['GPS'][piexif.GPSIFD.GPSLongitudeRef] = lon >= 0 ? 'E' : 'W';
+                    exifObj['GPS'][piexif.GPSIFD.GPSLongitude] = degToDmsRational(Math.abs(lon));
+                }
+                
+                const exifBytes = piexif.dump(exifObj);
+                const jpegWithExif = piexif.insert(exifBytes, jpegDataUrl);
+                
+                const blob = dataURItoBlob(jpegWithExif);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                
+                let filename = '';
+                
+                if (gpxStartTimestamp) {
+                    const date = new Date(gpxStartTimestamp);
+                    filename = String(date.getFullYear()).slice(-2) +
+                        String(date.getMonth() + 1).padStart(2, '0') +
+                        String(date.getDate()).padStart(2, '0') +
+                        String(date.getHours()).padStart(2, '0') +
+                        String(date.getMinutes()).padStart(2, '0');
+                } else {
+                    const now = new Date();
+                    filename = String(now.getFullYear()).slice(-2) +
+                        String(now.getMonth() + 1).padStart(2, '0') +
+                        String(now.getDate()).padStart(2, '0') +
+                        String(now.getHours()).padStart(2, '0') +
+                        String(now.getMinutes()).padStart(2, '0');
+                }
+                
+                const topTextVal = document.getElementById('inputTopText').value.trim();
+                if (topTextVal) {
+                    const cleanText = topTextVal.substring(0, 30).replace(/[^a-zA-Z0-9äöüÄÖÜ\s]/g, '').trim();
+                    filename += `-${cleanText}`;
+                }
+                
+                a.download = `${filename}.jpg`;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                setStatus('✅ Gespeichert!');
+                
+            } catch (error) {
+                console.error('Export Error:', error);
+                setStatus('❌ Fehler: ' + error.message);
+            }
+            
+            if (topTextWasVisible) topText.style.display = 'block';
+            if (bottomTextWasVisible) bottomText.style.display = 'block';
+            if (gridWasVisible) gridOverlay.style.display = 'block';
+            
+            if (trackWasVisible) {
+                windyAPI.map.addLayer(trackLayer);
+            }
+            visibleMarkers.forEach(marker => {
+                windyAPI.map.addLayer(marker);
+            });
+            
+            if (wasVisible) {
+                controls.style.display = 'block';
+                toggle.style.display = 'flex';
             }
         }
         
-        // 3. ZEICHNE TEXT (ganz oben) - Device-spezifische Größe
-        if (memeTextVisible && (topTextWasVisible || bottomTextWasVisible)) {
-            ctx.font = `900 ${settings.textTopSize}px Anton, Impact`;
-            ctx.textAlign = 'center';
-            ctx.fillStyle = 'white';
-            ctx.strokeStyle = 'black';
-            ctx.lineWidth = 8;
-            ctx.lineJoin = 'round';
-            
-            const topTextValue = document.getElementById('inputTopText').value.toUpperCase();
-            if (topTextValue && topTextWasVisible) {
-                const y = settings.textTopY;
-                ctx.strokeText(topTextValue, finalCanvas.width / 2, y);
-                ctx.fillText(topTextValue, finalCanvas.width / 2, y);
-            }
-            
-            ctx.font = `900 ${settings.textBottomSize}px Anton, Impact`;
-            const bottomTextValue = document.getElementById('inputBottomText').value.toUpperCase();
-            if (bottomTextValue && bottomTextWasVisible) {
-                const y = finalCanvas.height + settings.textBottomY;
-                ctx.strokeText(bottomTextValue, finalCanvas.width / 2, y);
-                ctx.fillText(bottomTextValue, finalCanvas.width / 2, y);
-            }
-        }
-        
-        // EXIF etc. (bleibt gleich)
-        const jpegDataUrl = finalCanvas.toDataURL('image/jpeg', 0.95);
-        
-        let exifObj = {};
-        
-        if (gpxStartTimestamp) {
-            const date = new Date(gpxStartTimestamp);
-            const exifDate = date.getFullYear() + ':' +
-                String(date.getMonth() + 1).padStart(2, '0') + ':' +
-                String(date.getDate()).padStart(2, '0') + ' ' +
-                String(date.getHours()).padStart(2, '0') + ':' +
-                String(date.getMinutes()).padStart(2, '0') + ':' +
-                String(date.getSeconds()).padStart(2, '0');
-            
-            exifObj['0th'] = {};
-            exifObj['0th'][piexif.ImageIFD.DateTime] = exifDate;
-            exifObj['0th'][piexif.ImageIFD.Software] = 'Windy GPX Creator';
-            
-            exifObj['Exif'] = {};
-            exifObj['Exif'][piexif.ExifIFD.DateTimeOriginal] = exifDate;
-            exifObj['Exif'][piexif.ExifIFD.DateTimeDigitized] = exifDate;
-        }
-        
-        if (gpxMiddleCoords) {
-            const lat = gpxMiddleCoords[0];
-            const lon = gpxMiddleCoords[1];
-            
-            exifObj['GPS'] = {};
-            exifObj['GPS'][piexif.GPSIFD.GPSLatitudeRef] = lat >= 0 ? 'N' : 'S';
-            exifObj['GPS'][piexif.GPSIFD.GPSLatitude] = degToDmsRational(Math.abs(lat));
-            exifObj['GPS'][piexif.GPSIFD.GPSLongitudeRef] = lon >= 0 ? 'E' : 'W';
-            exifObj['GPS'][piexif.GPSIFD.GPSLongitude] = degToDmsRational(Math.abs(lon));
-        }
-        
-        const exifBytes = piexif.dump(exifObj);
-        const jpegWithExif = piexif.insert(exifBytes, jpegDataUrl);
-        
-        const blob = dataURItoBlob(jpegWithExif);
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        
-        let filename = '';
-        
-        if (gpxStartTimestamp) {
-            const date = new Date(gpxStartTimestamp);
-            filename = String(date.getFullYear()).slice(-2) +
-                String(date.getMonth() + 1).padStart(2, '0') +
-                String(date.getDate()).padStart(2, '0') +
-                String(date.getHours()).padStart(2, '0') +
-                String(date.getMinutes()).padStart(2, '0');
-        } else {
-            const now = new Date();
-            filename = String(now.getFullYear()).slice(-2) +
-                String(now.getMonth() + 1).padStart(2, '0') +
-                String(now.getDate()).padStart(2, '0') +
-                String(now.getHours()).padStart(2, '0') +
-                String(now.getMinutes()).padStart(2, '0');
-        }
-        
-        const topTextVal = document.getElementById('inputTopText').value.trim();
-        if (topTextVal) {
-            const cleanText = topTextVal.substring(0, 30).replace(/[^a-zA-Z0-9äöüÄÖÜ\s]/g, '').trim();
-            filename += `-${cleanText}`;
-        }
-        
-        a.download = `${filename}.jpg`;
-        a.click();
-        URL.revokeObjectURL(url);
-        
-        setStatus('✅ Gespeichert!');
-        
-    } catch (error) {
-        console.error('Export Error:', error);
-        setStatus('❌ Fehler: ' + error.message);
-    }
-    
-    // Zeige alles wieder an
-    if (topTextWasVisible) topText.style.display = 'block';
-    if (bottomTextWasVisible) bottomText.style.display = 'block';
-    if (gridWasVisible) gridOverlay.style.display = 'block';
-    
-    if (trackWasVisible) {
-        windyAPI.map.addLayer(trackLayer);
-    }
-    visibleMarkers.forEach(marker => {
-        windyAPI.map.addLayer(marker);
-    });
-    
-    if (wasVisible) {
-        controls.style.display = 'block';
-        toggle.style.display = 'flex';
-    }
-}
-
-
-
-        
-        // EXIF Helper Funktionen
+        // EXIF Helper
         function degToDmsRational(deg) {
             const d = Math.floor(deg);
             const m = Math.floor((deg - d) * 60);
             const s = Math.round(((deg - d) * 60 - m) * 60 * 100);
-            
             return [[d, 1], [m, 1], [s, 100]];
         }
         
@@ -827,6 +812,14 @@ async function exportImage() {
             btn.textContent = particlesEnabled ? '💨 Partikel ✓' : '💨 Partikel';
         }
         
+        function resetAPIKey() {
+            if (confirm('API Key löschen?\n\nDu musst die Seite dann neu mit ?key=... öffnen.')) {
+                localStorage.removeItem('windy_api_key');
+                alert('API Key gelöscht!\n\nSeite wird neu geladen...');
+                location.reload();
+            }
+        }
+        
         // ====== GPX ======
         function testTrack() {
             if (!windyAPI) return;
@@ -892,7 +885,6 @@ async function exportImage() {
             
             const middleIndex = Math.floor(coords.length / 2);
             
-            // Speichere START-Zeit
             if (timestamps.length > 0) {
                 gpxStartTimestamp = timestamps[0];
                 
@@ -910,53 +902,46 @@ async function exportImage() {
                 setStatus(`✅ ${coords.length} Punkte`);
             }
             
-            // Speichere MITTE-Koordinaten für EXIF
             gpxMiddleCoords = coords[middleIndex];
-            
             displayTrack(coords);
         }
         
         function displayTrack(coords) {
-    clearTrack();
-    
-    // NUR BEIM ANZEIGEN: Zeichne Track auf Leaflet Map
-    trackLayer = L.polyline(coords, {
-        color: '#FFFFFF',
-        weight: 5,
-        opacity: 0.95,
-        smoothFactor: 1,
-        lineCap: 'round',
-        lineJoin: 'round'
-    }).addTo(windyAPI.map);
-    
-    // Start Marker (grün)
-    const start = L.circleMarker(coords[0], {
-        radius: 8,
-        fillColor: '#34C759',
-        color: 'white',
-        weight: 3,
-        fillOpacity: 1
-    }).addTo(windyAPI.map);
-    markers.push(start);
-    
-    // End Marker (rot)
-    const end = L.circleMarker(coords[coords.length - 1], {
-        radius: 8,
-        fillColor: '#FF3B30',
-        color: 'white',
-        weight: 3,
-        fillOpacity: 1
-    }).addTo(windyAPI.map);
-    markers.push(end);
-    
-    // Zoom auf Track
-    windyAPI.map.fitBounds(trackLayer.getBounds(), {
-        paddingTopLeft: [50, 80],
-        paddingBottomRight: [50, 80],
-        maxZoom: 14
-    });
-}
-
+            clearTrack();
+            
+            trackLayer = L.polyline(coords, {
+                color: '#FFFFFF',
+                weight: 5,
+                opacity: 0.95,
+                smoothFactor: 1,
+                lineCap: 'round',
+                lineJoin: 'round'
+            }).addTo(windyAPI.map);
+            
+            const start = L.circleMarker(coords[0], {
+                radius: 8,
+                fillColor: '#34C759',
+                color: 'white',
+                weight: 3,
+                fillOpacity: 1
+            }).addTo(windyAPI.map);
+            markers.push(start);
+            
+            const end = L.circleMarker(coords[coords.length - 1], {
+                radius: 8,
+                fillColor: '#FF3B30',
+                color: 'white',
+                weight: 3,
+                fillOpacity: 1
+            }).addTo(windyAPI.map);
+            markers.push(end);
+            
+            windyAPI.map.fitBounds(trackLayer.getBounds(), {
+                paddingTopLeft: [50, 80],
+                paddingBottomRight: [50, 80],
+                maxZoom: settings.maxZoom
+            });
+        }
         
         function clearTrack() {
             if (trackLayer) windyAPI.map.removeLayer(trackLayer);
