@@ -330,14 +330,14 @@ const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window
 
 const CONFIG = {
     desktop: {
-        textTopY: 60,
+        textTopY: 80, // <- +20
         textBottomY: -120,
-        textTopSize: 90,
-        textBottomSize: 90,
-        maxZoom: 14
+        textTopSize: 80,
+        textBottomSize: 80,
+        maxZoom: 13 // <- von 14 auf 13
     },
     mobile: {
-        textTopY: 40,
+        textTopY: 60, // <- +20
         textBottomY: -80,
         textTopSize: 70,
         textBottomSize: 70,
