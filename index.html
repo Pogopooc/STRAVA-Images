@@ -4,21 +4,31 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Strava Wetter">
-    <title>Strava Wetter</title>
+    <title>Windy + GPX Meme Creator</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Anton&display=swap');
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             height: 100vh;
             overflow: hidden;
             background: #000;
         }
         
-        #windy { width: 100%; height: 100vh; }
-        #windy #bottom, #windy #mobile-ovr-select, #windy #embed-zoom, #windy #logo-wrapper { display: none !important; }
+        #windy {
+            width: 100%;
+            height: 100vh;
+        }
+        
+        #windy #bottom,
+        #windy #mobile-ovr-select,
+        #windy #embed-zoom,
+        #windy #logo-wrapper {
+            display: none !important;
+        }
         
         .screenshot-frame {
             position: absolute;
@@ -56,15 +66,22 @@
         }
         
         .grid-overlay.contour {
-            background-image: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.12) 0px, rgba(255, 255, 255, 0.12) 1px, transparent 1px, transparent 15px);
-        }
-        
-        .grid-overlay.cross, .grid-overlay.wave {
-            background-image: none;
+            background-image: 
+                repeating-linear-gradient(
+                    0deg,
+                    rgba(255, 255, 255, 0.12) 0px,
+                    rgba(255, 255, 255, 0.12) 1px,
+                    transparent 1px,
+                    transparent 15px
+                );
         }
         
         @media (max-width: 768px) {
-            .screenshot-frame, .grid-overlay { width: 90vw; height: calc(90vw * 0.68); }
+            .screenshot-frame,
+            .grid-overlay {
+                width: 90vw;
+                height: calc(90vw * 0.68);
+            }
         }
         
         .meme-text {
@@ -77,14 +94,37 @@
             font-weight: 900;
             text-transform: uppercase;
             color: white;
-            text-shadow: -3px -3px 0 #000, 3px -3px 0 #000, -3px 3px 0 #000, 3px 3px 0 #000, -4px 0 0 #000, 4px 0 0 #000, 0 -4px 0 #000, 0 4px 0 #000;
+            text-shadow: 
+                -3px -3px 0 #000,
+                3px -3px 0 #000,
+                -3px 3px 0 #000,
+                3px 3px 0 #000,
+                -4px 0 0 #000,
+                4px 0 0 #000,
+                0 -4px 0 #000,
+                0 4px 0 #000;
             letter-spacing: 2px;
             width: 100%;
             padding: 0 20px;
         }
         
-        #topText { top: 30px; font-size: 45px; line-height: 1.1; }
-        #bottomText { bottom: 30px; font-size: 45px; line-height: 1.1; }
+        #topText {
+            top: 30px;
+            font-size: 45px;
+            line-height: 1.1;
+        }
+        
+        #bottomText {
+            bottom: 30px;
+            font-size: 45px;
+            line-height: 1.1;
+        }
+        
+        @media (max-width: 768px) {
+            #topText, #bottomText {
+                font-size: 32px;
+            }
+        }
         
         .controls {
             position: absolute;
@@ -95,13 +135,16 @@
             padding: 12px;
             border-radius: 10px;
             box-shadow: 0 2px 15px rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
             max-height: 85vh;
             overflow-y: auto;
             max-width: 200px;
-            transition: transform 0.3s;
+            transition: transform 0.3s ease;
         }
         
-        .controls.hidden { transform: translateX(-220px); }
+        .controls.hidden {
+            transform: translateX(-220px);
+        }
         
         .controls-toggle {
             position: absolute;
@@ -119,10 +162,12 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: transform 0.3s;
+            transition: transform 0.3s ease;
         }
         
-        .controls-toggle.active { transform: translateX(220px); }
+        .controls-toggle.active {
+            transform: translateX(220px);
+        }
         
         .section-title {
             font-size: 10px;
@@ -153,10 +198,14 @@
         
         .layer-temp { background: #FF9500; }
         .layer-wind { background: #5AC8FA; }
+        .layer-rain { background: #5856D6; }
+        .layer-clouds { background: #8E8E93; }
+        
         .strava-btn { background: #FC4C02; }
         .clear-btn { background: #FF3B30; }
         .test-btn { background: #34C759; }
         .export-btn { background: #FF2D55; font-size: 14px; font-weight: 700; }
+        .settings-btn { background: #8E8E93; font-size: 10px; }
         
         .toggle-group {
             display: flex;
@@ -180,6 +229,7 @@
             font-size: 12px;
             resize: vertical;
             min-height: 35px;
+            font-family: inherit;
             text-transform: uppercase;
         }
         
@@ -190,6 +240,13 @@
             background: rgba(0,0,0,0.05);
             border-radius: 5px;
             text-align: center;
+            word-wrap: break-word;
+        }
+        
+        .hint {
+            font-size: 9px;
+            color: #999;
+            margin-top: 2px;
         }
     </style>
 </head>
@@ -206,20 +263,22 @@
     <div class="grid-overlay" id="gridOverlay"></div>
     
     <div class="controls" id="controls" style="display:none;">
-        <button class="export-btn" onclick="exportImage()">📸 Speichern</button>
+        <button class="export-btn" onclick="exportImage()">📸 Bild speichern</button>
+        
         <hr style="border: none; border-top: 1px solid rgba(0,0,0,0.1); margin: 6px 0;">
         
         <div class="section-title">✏️ Text</div>
-        <textarea id="inputTopText" rows="2" placeholder="Oben..." oninput="updateText()"></textarea>
-        <textarea id="inputBottomText" rows="2" placeholder="Unten..." oninput="updateText()"></textarea>
+        <textarea id="inputTopText" rows="2" placeholder="Oben..." oninput="autoUpdateText()"></textarea>
+        <textarea id="inputBottomText" rows="2" placeholder="Unten..." oninput="autoUpdateText()"></textarea>
+        <div class="hint">💡 Wird automatisch GROSSGESCHRIEBEN</div>
         
         <div class="toggle-group">
-            <button id="btnShowText" class="active" onclick="toggleText()">Text</button>
+            <button id="btnShowText" class="active" onclick="toggleMemeText()">Text</button>
             <button id="btnShowFrame" class="active" onclick="toggleFrame()">Box</button>
         </div>
         <div class="toggle-group">
             <button id="btnShowGrid" class="active" onclick="toggleGrid()">Grid</button>
-            <button onclick="cycleGrid()">Stil</button>
+            <button onclick="cycleGridStyle()">Stil</button>
         </div>
         
         <hr style="border: none; border-top: 1px solid rgba(0,0,0,0.1); margin: 6px 0;">
@@ -229,6 +288,12 @@
             <button class="layer-temp active" onclick="setLayer('temp')">🌡️</button>
             <button class="layer-wind" onclick="setLayer('wind')">💨</button>
         </div>
+        <div class="toggle-group">
+            <button class="layer-rain" onclick="setLayer('rain')">🌧️</button>
+            <button class="layer-clouds" onclick="setLayer('clouds')">☁️</button>
+        </div>
+        
+        <button id="btnParticles" onclick="toggleParticles()">💨 Partikel</button>
         
         <hr style="border: none; border-top: 1px solid rgba(0,0,0,0.1); margin: 6px 0;">
         
@@ -236,6 +301,11 @@
         <button class="strava-btn" onclick="document.getElementById('gpxFile').click()">📁 GPX laden</button>
         <button class="test-btn" onclick="testTrack()">🧪 Test</button>
         <button class="clear-btn" onclick="clearTrack()">❌ Löschen</button>
+        
+        <hr style="border: none; border-top: 1px solid rgba(0,0,0,0.1); margin: 6px 0;">
+        
+        <div class="section-title">⚙️ Einstellungen</div>
+        <button class="settings-btn" onclick="resetAPIKey()">🔑 API Key löschen</button>
         
         <div id="status">Bereit</div>
     </div>
@@ -249,479 +319,669 @@
     <script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.min.js"></script>
     
     <script>
-        const API_KEY = new URLSearchParams(window.location.search).get('key') || localStorage.getItem('windy_key');
-        if (API_KEY) { localStorage.setItem('windy_key', API_KEY); window.history.replaceState({}, '', window.location.pathname); }
-        
-        let W = null, track = null, markers = [], textOn = true, frameOn = true, gridOn = true, controlsOn = true;
-        let gpxStart = null, gpxMiddle = null;
-        let currentGridStyle = 'normal';
-        
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
-        const cfg = isMobile ? { topY: 100, botY: -50, topSize: 70, botSize: 70, zoom: 13 } 
-                             : { topY: 100, botY: -50, topSize: 75, botSize: 75, zoom: 12 };
-        
-        function init() {
-            if (!API_KEY) { alert('⚠️ Öffne mit: ?key=DEIN_API_KEY'); return; }
-            if (typeof windyInit === 'undefined') { alert('Windy nicht geladen'); return; }
+        // ====== API KEY aus URL oder localStorage ======
+        function getAPIKey() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const keyFromURL = urlParams.get('key');
             
-            windyInit({ key: API_KEY, lat: 47.3769, lon: 8.5417, zoom: 10, hourFormat: '24h' }, api => {
-                W = api;
+            if (keyFromURL) {
+                localStorage.setItem('windy_api_key', keyFromURL);
+                window.history.replaceState({}, document.title, window.location.pathname);
+                return keyFromURL;
+            }
+            
+            const savedKey = localStorage.getItem('windy_api_key');
+            if (savedKey) {
+                return savedKey;
+            }
+            
+            return null;
+        }
+        
+        const API_KEY = getAPIKey();
+        
+        let windyAPI = null;
+        let trackLayer = null;
+        let markers = [];
+        let particlesEnabled = false;
+        let memeTextVisible = true;
+        let frameVisible = true;
+        let gridVisible = true;
+        let controlsVisible = true;
+        
+        let gpxStartTimestamp = null;
+        let gpxMiddleCoords = null;
+        
+        // ====== KONFIGURATION FÜR DESKTOP & MOBILE ======
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
+        
+        const CONFIG = {
+            desktop: {
+                textTopY: 100,
+                textBottomY: -50,
+                textTopSize: 75,
+                textBottomSize: 75,
+                maxZoom: 12
+            },
+            mobile: {
+                textTopY: 100,
+                textBottomY: -50,
+                textTopSize: 70,
+                textBottomSize: 70,
+                maxZoom: 13
+            }
+        };
+        
+        const settings = isMobile ? CONFIG.mobile : CONFIG.desktop;
+        
+        // ====== INIT ======
+        function initWindy() {
+            if (!API_KEY) {
+                alert('⚠️ Kein API Key gefunden!\n\nÖffne die App mit:\n?key=DEIN_API_KEY');
+                document.getElementById('controls').style.display = 'block';
+                setStatus('❌ API Key fehlt');
+                return;
+            }
+            
+            if (typeof windyInit === 'undefined') {
+                alert('Windy konnte nicht geladen werden.');
+                return;
+            }
+            
+            windyInit({
+                key: API_KEY,
+                lat: 47.3769,
+                lon: 8.5417,
+                zoom: 10,
+                timestamp: Date.now(),
+                hourFormat: '24h'
+            }, api => {
+                windyAPI = api;
+                window.W = api;
                 api.store.set('overlay', 'temp');
+                api.store.set('particlesAnim', 'off');
+                
                 document.getElementById('controls').style.display = 'block';
                 setStatus('✅ Bereit!');
             });
         }
         
-        window.addEventListener('load', () => setTimeout(init, 1000));
+        window.addEventListener('load', () => {
+            setTimeout(initWindy, 1000);
+        });
         
-        function updateText() {
-            document.getElementById('topText').textContent = document.getElementById('inputTopText').value.toUpperCase();
-            document.getElementById('bottomText').textContent = document.getElementById('inputBottomText').value.toUpperCase();
+        // ====== TEXT ======
+        function autoUpdateText() {
+            updateMemeText();
         }
         
+        function updateMemeText() {
+            const topValue = document.getElementById('inputTopText').value;
+            const bottomValue = document.getElementById('inputBottomText').value;
+            
+            document.getElementById('topText').textContent = topValue.toUpperCase();
+            document.getElementById('bottomText').textContent = bottomValue.toUpperCase();
+        }
+        
+        function toggleMemeText() {
+            memeTextVisible = !memeTextVisible;
+            const btn = document.getElementById('btnShowText');
+            
+            document.getElementById('topText').style.display = memeTextVisible ? 'block' : 'none';
+            document.getElementById('bottomText').style.display = memeTextVisible ? 'block' : 'none';
+            
+            btn.classList.toggle('active', memeTextVisible);
+            btn.textContent = memeTextVisible ? 'Text ✓' : 'Text';
+        }
+        
+        // ====== EXPORT ======
+        async function exportImage() {
+            if (!windyAPI) {
+                alert('Karte noch nicht geladen!');
+                return;
+            }
+            
+            if (!trackLayer) {
+                alert('Bitte erst GPX laden!');
+                return;
+            }
+            
+            setStatus('📸 Erstelle Bild...');
+            
+            const frame = document.getElementById('screenshotFrame');
+            const controls = document.getElementById('controls');
+            const toggle = document.getElementById('controlsToggle');
+            const gridOverlay = document.getElementById('gridOverlay');
+            
+            const wasVisible = controlsVisible;
+            
+            if (wasVisible) {
+                controls.style.display = 'none';
+                toggle.style.display = 'none';
+            }
+            
+            const topText = document.getElementById('topText');
+            const bottomText = document.getElementById('bottomText');
+            const topTextWasVisible = topText.style.display !== 'none';
+            const bottomTextWasVisible = bottomText.style.display !== 'none';
+            const gridWasVisible = gridOverlay.style.display !== 'none';
+            
+            topText.style.display = 'none';
+            bottomText.style.display = 'none';
+            gridOverlay.style.display = 'none';
+            
+            const trackWasVisible = windyAPI.map.hasLayer(trackLayer);
+            if (trackWasVisible) {
+                windyAPI.map.removeLayer(trackLayer);
+            }
+            
+            const visibleMarkers = [];
+            markers.forEach(marker => {
+                if (windyAPI.map.hasLayer(marker)) {
+                    visibleMarkers.push(marker);
+                    windyAPI.map.removeLayer(marker);
+                }
+            });
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            try {
+                const frameRect = frame.getBoundingClientRect();
+                
+                const canvas = await html2canvas(document.body, {
+                    useCORS: true,
+                    allowTaint: true,
+                    foreignObjectRendering: false,
+                    backgroundColor: '#000000',
+                    scale: 2,
+                    logging: false
+                });
+                
+                const finalCanvas = document.createElement('canvas');
+                finalCanvas.width = 540 * 2;
+                finalCanvas.height = 368 * 2;
+                const ctx = finalCanvas.getContext('2d');
+                
+                const scale = 2;
+                ctx.drawImage(
+                    canvas,
+                    frameRect.left * scale, frameRect.top * scale,
+                    frameRect.width * scale, frameRect.height * scale,
+                    0, 0, finalCanvas.width, finalCanvas.height
+                );
+                
+                // ZEICHNE TRACK
+                if (trackLayer) {
+                    const latlngs = trackLayer.getLatLngs();
+                    
+                    if (latlngs.length > 0) {
+                        ctx.strokeStyle = '#FFFFFF';
+                        ctx.lineWidth = 10;
+                        ctx.lineCap = 'round';
+                        ctx.lineJoin = 'round';
+                        ctx.globalAlpha = 0.95;
+                        
+                        ctx.beginPath();
+                        
+                        const mapRect = windyAPI.map.getContainer().getBoundingClientRect();
+                        const scaleX = finalCanvas.width / frameRect.width;
+                        const scaleY = finalCanvas.height / frameRect.height;
+                        
+                        latlngs.forEach((latlng, index) => {
+                            const point = windyAPI.map.latLngToContainerPoint(latlng);
+                            const viewportX = point.x + mapRect.left - frameRect.left;
+                            const viewportY = point.y + mapRect.top - frameRect.top;
+                            const x = viewportX * scaleX;
+                            const y = viewportY * scaleY;
+                            
+                            if (index === 0) {
+                                ctx.moveTo(x, y);
+                            } else {
+                                ctx.lineTo(x, y);
+                            }
+                        });
+                        
+                        ctx.stroke();
+                        ctx.globalAlpha = 1.0;
+                        
+                        const start = latlngs[0];
+                        const end = latlngs[latlngs.length - 1];
+                        
+                        const drawMarker = (latlng, color) => {
+                            const point = windyAPI.map.latLngToContainerPoint(latlng);
+                            const viewportX = point.x + mapRect.left - frameRect.left;
+                            const viewportY = point.y + mapRect.top - frameRect.top;
+                            const x = viewportX * scaleX;
+                            const y = viewportY * scaleY;
+                            
+                            ctx.beginPath();
+                            ctx.arc(x, y, 16, 0, Math.PI * 2);
+                            ctx.fillStyle = '#FFFFFF';
+                            ctx.fill();
+                            
+                            ctx.beginPath();
+                            ctx.arc(x, y, 11, 0, Math.PI * 2);
+                            ctx.fillStyle = color;
+                            ctx.fill();
+                        };
+                        
+                        drawMarker(start, '#34C759');
+                        drawMarker(end, '#FF3B30');
+                    }
+                }
+                
+                // ZEICHNE GRID
+                if (gridWasVisible) {
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                    ctx.lineWidth = 2;
+                    
+                    const grid = document.getElementById('gridOverlay');
+                    let gridSize = 40;
+                    
+                    if (grid.classList.contains('fine')) {
+                        gridSize = 20;
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+                    } else if (grid.classList.contains('contour')) {
+                        for (let y = 0; y < finalCanvas.height; y += 30) {
+                            ctx.beginPath();
+                            ctx.moveTo(0, y);
+                            ctx.lineTo(finalCanvas.width, y);
+                            ctx.stroke();
+                        }
+                    } else {
+                        for (let x = 0; x < finalCanvas.width; x += gridSize) {
+                            ctx.beginPath();
+                            ctx.moveTo(x, 0);
+                            ctx.lineTo(x, finalCanvas.height);
+                            ctx.stroke();
+                        }
+                        
+                        for (let y = 0; y < finalCanvas.height; y += gridSize) {
+                            ctx.beginPath();
+                            ctx.moveTo(0, y);
+                            ctx.lineTo(finalCanvas.width, y);
+                            ctx.stroke();
+                        }
+                    }
+                }
+                
+                // ZEICHNE TEXT
+                if (memeTextVisible && (topTextWasVisible || bottomTextWasVisible)) {
+                    ctx.font = `900 ${settings.textTopSize}px Anton, Impact`;
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = 'white';
+                    ctx.strokeStyle = 'black';
+                    ctx.lineWidth = 8;
+                    ctx.lineJoin = 'round';
+                    
+                    const topTextValue = document.getElementById('inputTopText').value.toUpperCase();
+                    if (topTextValue && topTextWasVisible) {
+                        const y = settings.textTopY;
+                        ctx.strokeText(topTextValue, finalCanvas.width / 2, y);
+                        ctx.fillText(topTextValue, finalCanvas.width / 2, y);
+                    }
+                    
+                    ctx.font = `900 ${settings.textBottomSize}px Anton, Impact`;
+                    const bottomTextValue = document.getElementById('inputBottomText').value.toUpperCase();
+                    if (bottomTextValue && bottomTextWasVisible) {
+                        const y = finalCanvas.height + settings.textBottomY;
+                        ctx.strokeText(bottomTextValue, finalCanvas.width / 2, y);
+                        ctx.fillText(bottomTextValue, finalCanvas.width / 2, y);
+                    }
+                }
+                
+                // EXIF
+                const jpegDataUrl = finalCanvas.toDataURL('image/jpeg', 0.95);
+                
+                let exifObj = {};
+                
+                if (gpxStartTimestamp) {
+                    const date = new Date(gpxStartTimestamp);
+                    const exifDate = date.getFullYear() + ':' +
+                        String(date.getMonth() + 1).padStart(2, '0') + ':' +
+                        String(date.getDate()).padStart(2, '0') + ' ' +
+                        String(date.getHours()).padStart(2, '0') + ':' +
+                        String(date.getMinutes()).padStart(2, '0') + ':' +
+                        String(date.getSeconds()).padStart(2, '0');
+                    
+                    exifObj['0th'] = {};
+                    exifObj['0th'][piexif.ImageIFD.DateTime] = exifDate;
+                    exifObj['0th'][piexif.ImageIFD.Software] = 'Windy GPX Creator';
+                    
+                    exifObj['Exif'] = {};
+                    exifObj['Exif'][piexif.ExifIFD.DateTimeOriginal] = exifDate;
+                    exifObj['Exif'][piexif.ExifIFD.DateTimeDigitized] = exifDate;
+                }
+                
+                if (gpxMiddleCoords) {
+                    const lat = gpxMiddleCoords[0];
+                    const lon = gpxMiddleCoords[1];
+                    
+                    exifObj['GPS'] = {};
+                    exifObj['GPS'][piexif.GPSIFD.GPSLatitudeRef] = lat >= 0 ? 'N' : 'S';
+                    exifObj['GPS'][piexif.GPSIFD.GPSLatitude] = degToDmsRational(Math.abs(lat));
+                    exifObj['GPS'][piexif.GPSIFD.GPSLongitudeRef] = lon >= 0 ? 'E' : 'W';
+                    exifObj['GPS'][piexif.GPSIFD.GPSLongitude] = degToDmsRational(Math.abs(lon));
+                }
+                
+                const exifBytes = piexif.dump(exifObj);
+                const jpegWithExif = piexif.insert(exifBytes, jpegDataUrl);
+                
+                const blob = dataURItoBlob(jpegWithExif);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                
+                let filename = '';
+                
+                if (gpxStartTimestamp) {
+                    const date = new Date(gpxStartTimestamp);
+                    filename = String(date.getFullYear()).slice(-2) +
+                        String(date.getMonth() + 1).padStart(2, '0') +
+                        String(date.getDate()).padStart(2, '0') +
+                        String(date.getHours()).padStart(2, '0') +
+                        String(date.getMinutes()).padStart(2, '0');
+                } else {
+                    const now = new Date();
+                    filename = String(now.getFullYear()).slice(-2) +
+                        String(now.getMonth() + 1).padStart(2, '0') +
+                        String(now.getDate()).padStart(2, '0') +
+                        String(now.getHours()).padStart(2, '0') +
+                        String(now.getMinutes()).padStart(2, '0');
+                }
+                
+                const topTextVal = document.getElementById('inputTopText').value.trim();
+                if (topTextVal) {
+                    const cleanText = topTextVal.substring(0, 30).replace(/[^a-zA-Z0-9äöüÄÖÜ\s]/g, '').trim();
+                    filename += `-${cleanText}`;
+                }
+                
+                a.download = `${filename}.jpg`;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                setStatus('✅ Gespeichert!');
+                
+            } catch (error) {
+                console.error('Export Error:', error);
+                setStatus('❌ Fehler: ' + error.message);
+            }
+            
+            if (topTextWasVisible) topText.style.display = 'block';
+            if (bottomTextWasVisible) bottomText.style.display = 'block';
+            if (gridWasVisible) gridOverlay.style.display = 'block';
+            
+            if (trackWasVisible) {
+                windyAPI.map.addLayer(trackLayer);
+            }
+            visibleMarkers.forEach(marker => {
+                windyAPI.map.addLayer(marker);
+            });
+            
+            if (wasVisible) {
+                controls.style.display = 'block';
+                toggle.style.display = 'flex';
+            }
+        }
+        
+        // EXIF Helper
+        function degToDmsRational(deg) {
+            const d = Math.floor(deg);
+            const m = Math.floor((deg - d) * 60);
+            const s = Math.round(((deg - d) * 60 - m) * 60 * 100);
+            return [[d, 1], [m, 1], [s, 100]];
+        }
+        
+        function dataURItoBlob(dataURI) {
+            const byteString = atob(dataURI.split(',')[1]);
+            const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+            const ab = new ArrayBuffer(byteString.length);
+            const ia = new Uint8Array(ab);
+            
+            for (let i = 0; i < byteString.length; i++) {
+                ia[i] = byteString.charCodeAt(i);
+            }
+            
+            return new Blob([ab], { type: mimeString });
+        }
+        
+        // ====== CONTROLS ======
         function toggleControls() {
-            controlsOn = !controlsOn;
-            document.getElementById('controls').classList.toggle('hidden', !controlsOn);
-            document.getElementById('controlsToggle').classList.toggle('active', !controlsOn);
-            document.getElementById('controlsToggle').textContent = controlsOn ? '⚙️' : '✕';
-        }
-        
-        function toggleText() {
-            textOn = !textOn;
-            document.getElementById('topText').style.display = textOn ? 'block' : 'none';
-            document.getElementById('bottomText').style.display = textOn ? 'block' : 'none';
-            document.getElementById('btnShowText').classList.toggle('active', textOn);
-            document.getElementById('btnShowText').textContent = textOn ? 'Text ✓' : 'Text';
+            controlsVisible = !controlsVisible;
+            const controls = document.getElementById('controls');
+            const toggle = document.getElementById('controlsToggle');
+            
+            if (controlsVisible) {
+                controls.classList.remove('hidden');
+                toggle.classList.remove('active');
+                toggle.textContent = '⚙️';
+            } else {
+                controls.classList.add('hidden');
+                toggle.classList.add('active');
+                toggle.textContent = '✕';
+            }
         }
         
         function toggleFrame() {
-            frameOn = !frameOn;
-            document.getElementById('screenshotFrame').style.display = frameOn ? 'block' : 'none';
-            document.getElementById('btnShowFrame').classList.toggle('active', frameOn);
-            document.getElementById('btnShowFrame').textContent = frameOn ? 'Box ✓' : 'Box';
+            frameVisible = !frameVisible;
+            document.getElementById('screenshotFrame').style.display = frameVisible ? 'block' : 'none';
+            document.getElementById('btnShowFrame').classList.toggle('active', frameVisible);
+            document.getElementById('btnShowFrame').textContent = frameVisible ? 'Box ✓' : 'Box';
         }
         
         function toggleGrid() {
-            gridOn = !gridOn;
-            document.getElementById('gridOverlay').style.display = gridOn ? 'block' : 'none';
-            document.getElementById('btnShowGrid').classList.toggle('active', gridOn);
-            document.getElementById('btnShowGrid').textContent = gridOn ? 'Grid ✓' : 'Grid';
+            gridVisible = !gridVisible;
+            document.getElementById('gridOverlay').style.display = gridVisible ? 'block' : 'none';
+            document.getElementById('btnShowGrid').classList.toggle('active', gridVisible);
+            document.getElementById('btnShowGrid').textContent = gridVisible ? 'Grid ✓' : 'Grid';
         }
         
-        function cycleGrid() {
-            const g = document.getElementById('gridOverlay');
-            const styles = ['normal', 'fine', 'contour', 'cross', 'wave'];
-            const currentIndex = styles.indexOf(currentGridStyle);
-            const nextIndex = (currentIndex + 1) % styles.length;
-            currentGridStyle = styles[nextIndex];
+        function cycleGridStyle() {
+            const grid = document.getElementById('gridOverlay');
             
-            g.className = 'grid-overlay';
-            const oldCanvas = g.querySelector('canvas');
-            if (oldCanvas) oldCanvas.remove();
-            
-            if (currentGridStyle === 'fine') {
-                g.classList.add('fine');
-                setStatus('Grid: Fein');
-            } else if (currentGridStyle === 'contour') {
-                g.classList.add('contour');
-                setStatus('Grid: Linien');
-            } else if (currentGridStyle === 'cross') {
-                g.classList.add('cross');
-                drawCrossGrid();
-                setStatus('Grid: Kreuz');
-            } else if (currentGridStyle === 'wave') {
-                g.classList.add('wave');
-                drawWaveGrid();
-                setStatus('Grid: Wellen');
+            if (!grid.classList.contains('fine') && !grid.classList.contains('contour')) {
+                grid.classList.add('fine');
+                setStatus('Fein');
+            } else if (grid.classList.contains('fine')) {
+                grid.classList.remove('fine');
+                grid.classList.add('contour');
+                setStatus('Linien');
             } else {
-                setStatus('Grid: Normal');
+                grid.classList.remove('contour');
+                setStatus('Normal');
             }
         }
         
-        function drawCrossGrid() {
-            const g = document.getElementById('gridOverlay');
-            const canvas = document.createElement('canvas');
-            canvas.width = 540;
-            canvas.height = 368;
-            canvas.style.cssText = 'width:100%;height:100%;position:absolute;top:0;left:0;pointer-events:none;';
-            g.appendChild(canvas);
-            
-            const ctx = canvas.getContext('2d');
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-            ctx.lineWidth = 1;
-            
-            const gridSize = 60, crossSize = 6, dotSize = 1.5;
-            
-            for (let x = 0; x <= canvas.width; x += gridSize) {
-                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
-            }
-            for (let y = 0; y <= canvas.height; y += gridSize) {
-                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
-            }
-            
-            for (let x = 0; x <= canvas.width; x += gridSize) {
-                for (let y = 0; y <= canvas.height; y += gridSize) {
-                    ctx.beginPath();
-                    ctx.moveTo(x - crossSize, y); ctx.lineTo(x + crossSize, y);
-                    ctx.moveTo(x, y - crossSize); ctx.lineTo(x, y + crossSize);
-                    ctx.stroke();
-                }
-            }
-            
-            for (let x = gridSize / 2; x < canvas.width; x += gridSize) {
-                for (let y = gridSize / 2; y < canvas.height; y += gridSize) {
-                    ctx.beginPath(); ctx.arc(x, y, dotSize, 0, Math.PI * 2); ctx.fill();
-                }
+        function toggleParticles() {
+    if (!windyAPI) return;
+    particlesEnabled = !particlesEnabled;
+    
+    const btn = document.getElementById('btnParticles');
+    
+    if (particlesEnabled) {
+        windyAPI.store.set('overlay', 'wind'); // Wechsle zu Wind
+        windyAPI.store.set('particlesAnim', 'on');
+        btn.classList.add('active');
+        btn.textContent = '💨 Partikel ✓';
+        setStatus('Wind-Partikel aktiv');
+    } else {
+        windyAPI.store.set('particlesAnim', 'off');
+        btn.classList.remove('active');
+        btn.textContent = '💨 Partikel';
+        setStatus('Partikel aus');
+    }
+}
+
+function setLayer(overlay) {
+    if (!windyAPI) return;
+    
+    windyAPI.store.set('overlay', overlay);
+    
+    // Wenn nicht Wind-Layer, schalte Partikel aus
+    if (overlay !== 'wind' && particlesEnabled) {
+        particlesEnabled = false;
+        windyAPI.store.set('particlesAnim', 'off');
+        document.getElementById('btnParticles').classList.remove('active');
+        document.getElementById('btnParticles').textContent = '💨 Partikel';
+    }
+    
+    document.querySelectorAll('.controls button[class*="layer-"]').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    const layerNames = {
+        'temp': '🌡️ Temperatur',
+        'wind': '💨 Wind',
+        'rain': '🌧️ Regen',
+        'clouds': '☁️ Wolken'
+    };
+    
+    setStatus(layerNames[overlay] || overlay);
+}
+
+        
+        function resetAPIKey() {
+            if (confirm('API Key löschen?\n\nDu musst die Seite dann neu mit ?key=... öffnen.')) {
+                localStorage.removeItem('windy_api_key');
+                alert('API Key gelöscht!\n\nSeite wird neu geladen...');
+                location.reload();
             }
         }
         
-        function drawWaveGrid() {
-            const g = document.getElementById('gridOverlay');
-            const canvas = document.createElement('canvas');
-            canvas.width = 540;
-            canvas.height = 368;
-            canvas.style.cssText = 'width:100%;height:100%;position:absolute;top:0;left:0;pointer-events:none;';
-            g.appendChild(canvas);
-            
-            const ctx = canvas.getContext('2d');
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-            ctx.lineWidth = 1.5;
-            
-            const rows = 12, cols = 16;
-            const cellW = canvas.width / cols, cellH = canvas.height / rows;
-            const amp = 5 + Math.random() * 10;
-            const freq = 0.02 + Math.random() * 0.03;
-            const offX = Math.random() * 100, offY = Math.random() * 100;
-            
-            for (let row = 0; row <= rows; row++) {
-                ctx.beginPath();
-                const baseY = row * cellH;
-                for (let x = 0; x <= canvas.width; x += 2) {
-                    const wave = Math.sin((x + offX) * freq) * amp;
-                    const y = baseY + wave;
-                    x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-                }
-                ctx.stroke();
-            }
-            
-            for (let col = 0; col <= cols; col++) {
-                ctx.beginPath();
-                const baseX = col * cellW;
-                for (let y = 0; y <= canvas.height; y += 2) {
-                    const wave = Math.sin((y + offY) * freq * 0.8) * amp;
-                    const x = baseX + wave;
-                    y === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-                }
-                ctx.stroke();
-            }
-            
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-            for (let row = 0; row <= rows; row++) {
-                for (let col = 0; col <= cols; col++) {
-                    const baseX = col * cellW, baseY = row * cellH;
-                    const waveX = Math.sin((baseY + offY) * freq * 0.8) * amp;
-                    const waveY = Math.sin((baseX + offX) * freq) * amp;
-                    ctx.beginPath(); ctx.arc(baseX + waveX, baseY + waveY, 2, 0, Math.PI * 2); ctx.fill();
-                }
-            }
-        }
-        
-        function setLayer(o) {
-            if (!W) return;
-            W.store.set('overlay', o);
-            document.querySelectorAll('.controls button[class*="layer-"]').forEach(b => b.classList.remove('active'));
-            event.target.classList.add('active');
-        }
-        
+        // ====== GPX ======
         function testTrack() {
-            if (!W) return;
-            displayTrack([[46.9479, 7.4474], [46.92, 7.48], [46.89, 7.52], [46.86, 7.56], [46.83, 7.6], [46.8, 7.64]]);
-        }
-        
-        function loadGPX(e) {
-            const f = e.target.files[0];
-            if (!f || !W) return;
-            setStatus('⏳ Lade...');
-            const r = new FileReader();
-            r.onload = ev => {
-                try { parseGPX(ev.target.result); } 
-                catch (err) { setStatus('❌ ' + err.message); }
-            };
-            r.readAsText(f);
-        }
-        
-        function parseGPX(s) {
-            const xml = new DOMParser().parseFromString(s, 'text/xml');
-            let pts = xml.querySelectorAll('trkpt');
-            if (pts.length === 0) pts = xml.querySelectorAll('rtept');
-            if (pts.length === 0) throw new Error('Keine Punkte');
+            if (!windyAPI) return;
             
-            const coords = [], times = [];
-            pts.forEach(p => {
-                const lat = parseFloat(p.getAttribute('lat'));
-                const lon = parseFloat(p.getAttribute('lon'));
+            const coords = [
+                [46.9479, 7.4474],
+                [46.9200, 7.4800],
+                [46.8900, 7.5200],
+                [46.8600, 7.5600],
+                [46.8300, 7.6000],
+                [46.8000, 7.6400]
+            ];
+            
+            displayTrack(coords);
+        }
+        
+        function loadGPX(event) {
+            const file = event.target.files[0];
+            if (!file || !windyAPI) return;
+            
+            setStatus('⏳ Lade...');
+            
+            const reader = new FileReader();
+            reader.onload = e => {
+                try {
+                    parseGPX(e.target.result);
+                } catch (error) {
+                    setStatus('❌ ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+        
+        function parseGPX(gpxString) {
+            const xml = new DOMParser().parseFromString(gpxString, 'text/xml');
+            
+            let points = xml.querySelectorAll('trkpt');
+            if (points.length === 0) points = xml.querySelectorAll('rtept');
+            if (points.length === 0) points = xml.querySelectorAll('wpt');
+            
+            if (points.length === 0) throw new Error('Keine Punkte');
+            
+            const coords = [];
+            const timestamps = [];
+            
+            points.forEach(pt => {
+                const lat = parseFloat(pt.getAttribute('lat'));
+                const lon = parseFloat(pt.getAttribute('lon'));
+                
                 if (!isNaN(lat) && !isNaN(lon)) {
                     coords.push([lat, lon]);
-                    const t = p.querySelector('time');
-                    if (t) times.push(new Date(t.textContent).getTime());
+                    
+                    const timeElement = pt.querySelector('time');
+                    if (timeElement) {
+                        const timeString = timeElement.textContent;
+                        const timestamp = new Date(timeString).getTime();
+                        timestamps.push(timestamp);
+                    }
                 }
             });
             
             if (coords.length === 0) throw new Error('Keine Koordinaten');
             
-            const mid = Math.floor(coords.length / 2);
-            if (times.length > 0) {
-                gpxStart = times[0];
-                gpxMiddle = coords[mid];
-                if (times[mid]) W.store.set('timestamp', times[mid]);
-                const d = new Date(times[0]);
-                setStatus(`✅ ${coords.length} | ${d.toLocaleDateString('de-CH', {day:'2-digit', month:'2-digit'})} ${d.toLocaleTimeString('de-CH', {hour:'2-digit', minute:'2-digit'})}`);
+            const middleIndex = Math.floor(coords.length / 2);
+            
+            if (timestamps.length > 0) {
+                gpxStartTimestamp = timestamps[0];
+                
+                if (timestamps[middleIndex]) {
+                    windyAPI.store.set('timestamp', timestamps[middleIndex]);
+                }
+                
+                const date = new Date(timestamps[0]);
+                const timeStr = date.toLocaleTimeString('de-CH', {hour: '2-digit', minute: '2-digit'});
+                const dateStr = date.toLocaleDateString('de-CH', {day: '2-digit', month: '2-digit'});
+                
+                setStatus(`✅ ${coords.length} | ${dateStr} ${timeStr}`);
             } else {
+                gpxStartTimestamp = null;
                 setStatus(`✅ ${coords.length} Punkte`);
             }
             
+            gpxMiddleCoords = coords[middleIndex];
             displayTrack(coords);
         }
         
         function displayTrack(coords) {
             clearTrack();
-            track = L.polyline(coords, {color: '#FFF', weight: 5, opacity: 0.95, smoothFactor: 1}).addTo(W.map);
-            const s = L.circleMarker(coords[0], {radius: 8, fillColor: '#34C759', color: '#fff', weight: 3, fillOpacity: 1}).addTo(W.map);
-            const e = L.circleMarker(coords[coords.length-1], {radius: 8, fillColor: '#FF3B30', color: '#fff', weight: 3, fillOpacity: 1}).addTo(W.map);
-            markers.push(s, e);
-            W.map.fitBounds(track.getBounds(), {paddingTopLeft: [50,80], paddingBottomRight: [50,80], maxZoom: cfg.zoom});
+            
+            trackLayer = L.polyline(coords, {
+                color: '#FFFFFF',
+                weight: 5,
+                opacity: 0.95,
+                smoothFactor: 1,
+                lineCap: 'round',
+                lineJoin: 'round'
+            }).addTo(windyAPI.map);
+            
+            const start = L.circleMarker(coords[0], {
+                radius: 8,
+                fillColor: '#34C759',
+                color: 'white',
+                weight: 3,
+                fillOpacity: 1
+            }).addTo(windyAPI.map);
+            markers.push(start);
+            
+            const end = L.circleMarker(coords[coords.length - 1], {
+                radius: 8,
+                fillColor: '#FF3B30',
+                color: 'white',
+                weight: 3,
+                fillOpacity: 1
+            }).addTo(windyAPI.map);
+            markers.push(end);
+            
+            windyAPI.map.fitBounds(trackLayer.getBounds(), {
+                paddingTopLeft: [50, 80],
+                paddingBottomRight: [50, 80],
+                maxZoom: settings.maxZoom
+            });
         }
         
         function clearTrack() {
-            if (track) W.map.removeLayer(track);
-            markers.forEach(m => W.map.removeLayer(m));
-            track = null;
+            if (trackLayer) windyAPI.map.removeLayer(trackLayer);
+            markers.forEach(m => windyAPI.map.removeLayer(m));
+            trackLayer = null;
             markers = [];
         }
         
-        async function export ```javascript
-Image() {
-            if (!W || !track) { alert('Bitte GPX laden!'); return; }
-            
-            setStatus('📸 Erstelle...');
-            
-            const frame = document.getElementById('screenshotFrame');
-            const ctrl = document.getElementById('controls');
-            const tog = document.getElementById('controlsToggle');
-            const grid = document.getElementById('gridOverlay');
-            const top = document.getElementById('topText');
-            const bot = document.getElementById('bottomText');
-            
-            const wasVis = controlsOn;
-            if (wasVis) { ctrl.style.display = 'none'; tog.style.display = 'none'; }
-            
-            const topVis = top.style.display !== 'none';
-            const botVis = bot.style.display !== 'none';
-            const gridVis = grid.style.display !== 'none';
-            
-            top.style.display = 'none';
-            bot.style.display = 'none';
-            grid.style.display = 'none';
-            
-            if (W.map.hasLayer(track)) W.map.removeLayer(track);
-            const savedMarkers = markers.filter(m => { if (W.map.hasLayer(m)) { W.map.removeLayer(m); return true; } });
-            
-            await new Promise(r => setTimeout(r, 500));
-            
-            try {
-                const rect = frame.getBoundingClientRect();
-                const canvas = await html2canvas(document.body, {useCORS: true, allowTaint: true, foreignObjectRendering: false, backgroundColor: '#000', scale: 2, logging: false});
-                
-                const final = document.createElement('canvas');
-                final.width = 540 * 2;
-                final.height = 368 * 2;
-                const ctx = final.getContext('2d');
-                
-                ctx.drawImage(canvas, rect.left * 2, rect.top * 2, rect.width * 2, rect.height * 2, 0, 0, final.width, final.height);
-                
-                // Draw track
-                if (track) {
-                    const ll = track.getLatLngs();
-                    ctx.strokeStyle = '#FFF';
-                    ctx.lineWidth = 10;
-                    ctx.lineCap = 'round';
-                    ctx.lineJoin = 'round';
-                    ctx.globalAlpha = 0.95;
-                    ctx.beginPath();
-                    
-                    const mr = W.map.getContainer().getBoundingClientRect();
-                    const sx = final.width / rect.width;
-                    const sy = final.height / rect.height;
-                    
-                    ll.forEach((latlng, i) => {
-                        const p = W.map.latLngToContainerPoint(latlng);
-                        const x = (p.x + mr.left - rect.left) * sx;
-                        const y = (p.y + mr.top - rect.top) * sy;
-                        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-                    });
-                    
-                    ctx.stroke();
-                    ctx.globalAlpha = 1;
-                    
-                    const dm = (ll, c) => {
-                        const p = W.map.latLngToContainerPoint(ll);
-                        const x = (p.x + mr.left - rect.left) * sx;
-                        const y = (p.y + mr.top - rect.top) * sy;
-                        ctx.beginPath(); ctx.arc(x, y, 16, 0, Math.PI*2); ctx.fillStyle = '#FFF'; ctx.fill();
-                        ctx.beginPath(); ctx.arc(x, y, 11, 0, Math.PI*2); ctx.fillStyle = c; ctx.fill();
-                    };
-                    
-                    dm(ll[0], '#34C759');
-                    dm(ll[ll.length-1], '#FF3B30');
-                }
-                
-                // Draw grid
-                if (gridVis) {
-                    if (currentGridStyle === 'cross') {
-                        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-                        ctx.fillStyle = 'rgba(255,255,255,0.15)';
-                        ctx.lineWidth = 2;
-                        const gs = 120, cs = 12, ds = 3;
-                        
-                        for (let x = 0; x <= final.width; x += gs) {
-                            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, final.height); ctx.stroke();
-                        }
-                        for (let y = 0; y <= final.height; y += gs) {
-                            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(final.width, y); ctx.stroke();
-                        }
-                        
-                        for (let x = 0; x <= final.width; x += gs) {
-                            for (let y = 0; y <= final.height; y += gs) {
-                                ctx.beginPath();
-                                ctx.moveTo(x - cs, y); ctx.lineTo(x + cs, y);
-                                ctx.moveTo(x, y - cs); ctx.lineTo(x, y + cs);
-                                ctx.stroke();
-                            }
-                        }
-                        
-                        for (let x = gs / 2; x < final.width; x += gs) {
-                            for (let y = gs / 2; y < final.height; y += gs) {
-                                ctx.beginPath(); ctx.arc(x, y, ds, 0, Math.PI * 2); ctx.fill();
-                            }
-                        }
-                    } else if (currentGridStyle === 'wave') {
-                        const gridCanvas = grid.querySelector('canvas');
-                        if (gridCanvas) {
-                            ctx.drawImage(gridCanvas, 0, 0, final.width, final.height);
-                        }
-                    } else if (currentGridStyle === 'fine') {
-                        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-                        ctx.lineWidth = 2;
-                        const gs = 20;
-                        for (let x = 0; x < final.width; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, final.height); ctx.stroke(); }
-                        for (let y = 0; y < final.height; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(final.width, y); ctx.stroke(); }
-                    } else if (currentGridStyle === 'contour') {
-                        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-                        ctx.lineWidth = 2;
-                        for (let y = 0; y < final.height; y += 30) {
-                            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(final.width, y); ctx.stroke();
-                        }
-                    } else {
-                        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-                        ctx.lineWidth = 2;
-                        const gs = 40;
-                        for (let x = 0; x < final.width; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, final.height); ctx.stroke(); }
-                        for (let y = 0; y < final.height; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(final.width, y); ctx.stroke(); }
-                    }
-                }
-                
-                // Draw text
-                if (textOn && (topVis || botVis)) {
-                    ctx.textAlign = 'center';
-                    ctx.fillStyle = '#fff';
-                    ctx.strokeStyle = '#000';
-                    ctx.lineWidth = 8;
-                    ctx.lineJoin = 'round';
-                    
-                    const topTxt = document.getElementById('inputTopText').value.toUpperCase();
-                    if (topTxt && topVis) {
-                        ctx.font = `900 ${cfg.topSize}px Anton, Impact`;
-                        ctx.strokeText(topTxt, final.width / 2, cfg.topY);
-                        ctx.fillText(topTxt, final.width / 2, cfg.topY);
-                    }
-                    
-                    const botTxt = document.getElementById('inputBottomText').value.toUpperCase();
-                    if (botTxt && botVis) {
-                        ctx.font = `900 ${cfg.botSize}px Anton, Impact`;
-                        ctx.strokeText(botTxt, final.width / 2, final.height + cfg.botY);
-                        ctx.fillText(botTxt, final.width / 2, final.height + cfg.botY);
-                    }
-                }
-                
-                // EXIF
-                const jpg = final.toDataURL('image/jpeg', 0.95);
-                let exif = {};
-                
-                if (gpxStart) {
-                    const d = new Date(gpxStart);
-                    const ed = `${d.getFullYear()}:${String(d.getMonth()+1).padStart(2,'0')}:${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
-                    exif['0th'] = {}; exif['0th'][piexif.ImageIFD.DateTime] = ed;
-                    exif['Exif'] = {}; exif['Exif'][piexif.ExifIFD.DateTimeOriginal] = ed;
-                }
-                
-                if (gpxMiddle) {
-                    const d2d = (d) => {
-                        const deg = Math.floor(d);
-                        const min = Math.floor((d - deg) * 60);
-                        const sec = Math.round(((d - deg) * 60 - min) * 60 * 100);
-                        return [[deg, 1], [min, 1], [sec, 100]];
-                    };
-                    exif['GPS'] = {};
-                    exif['GPS'][piexif.GPSIFD.GPSLatitudeRef] = gpxMiddle[0] >= 0 ? 'N' : 'S';
-                    exif['GPS'][piexif.GPSIFD.GPSLatitude] = d2d(Math.abs(gpxMiddle[0]));
-                    exif['GPS'][piexif.GPSIFD.GPSLongitudeRef] = gpxMiddle[1] >= 0 ? 'E' : 'W';
-                    exif['GPS'][piexif.GPSIFD.GPSLongitude] = d2d(Math.abs(gpxMiddle[1]));
-                }
-                
-                const exifBytes = piexif.dump(exif);
-                const jpgExif = piexif.insert(exifBytes, jpg);
-                
-                const b = atob(jpgExif.split(',')[1]);
-                const ab = new ArrayBuffer(b.length);
-                const ia = new Uint8Array(ab);
-                for (let i = 0; i < b.length; i++) ia[i] = b.charCodeAt(i);
-                const blob = new Blob([ab], {type: 'image/jpeg'});
-                
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                
-                let fn = '';
-                if (gpxStart) {
-                    const d = new Date(gpxStart);
-                    fn = String(d.getFullYear()).slice(-2) + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0') + String(d.getHours()).padStart(2,'0') + String(d.getMinutes()).padStart(2,'0');
-                } else {
-                    const n = new Date();
-                    fn = String(n.getFullYear()).slice(-2) + String(n.getMonth()+1).padStart(2,'0') + String(n.getDate()).padStart(2,'0') + String(n.getHours()).padStart(2,'0') + String(n.getMinutes()).padStart(2,'0');
-                }
-                
-                const txt = document.getElementById('inputTopText').value.trim();
-                if (txt) fn += `-${txt.substring(0,30).replace(/[^a-zA-Z0-9äöüÄÖÜ\s]/g,'').trim()}`;
-                
-                a.download = `${fn}.jpg`;
-                a.click();
-                URL.revokeObjectURL(url);
-                setStatus('✅ Gespeichert!');
-            } catch (err) {
-                console.error(err);
-                setStatus('❌ Fehler');
-            }
-            
-            if (topVis) top.style.display = 'block';
-            if (botVis) bot.style.display = 'block';
-            if (gridVis) grid.style.display = 'block';
-            W.map.addLayer(track);
-            savedMarkers.forEach(m => W.map.addLayer(m));
-            if (wasVis) { ctrl.style.display = 'block'; tog.style.display = 'flex'; }
+        function setStatus(text) {
+            document.getElementById('status').textContent = text;
         }
-        
-        function setStatus(s) { document.getElementById('status').textContent = s; }
     </script>
 </body>
 </html>
