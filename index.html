@@ -377,7 +377,7 @@
             btn.textContent = memeTextVisible ? 'Text ✓' : 'Text';
         }
         
-        // ====== HYBRID EXPORT: html2canvas + manueller Track ======
+// ====== EXPORT mit verstecktem Original-Track ======
 async function exportImage() {
     if (!windyAPI) {
         alert('Karte noch nicht geladen!');
@@ -401,12 +401,26 @@ async function exportImage() {
         toggle.style.display = 'none';
     }
     
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // VERSTECKE Original-Track und Marker temporär
+    const trackWasVisible = windyAPI.map.hasLayer(trackLayer);
+    if (trackWasVisible) {
+        windyAPI.map.removeLayer(trackLayer);
+    }
+    
+    const visibleMarkers = [];
+    markers.forEach(marker => {
+        if (windyAPI.map.hasLayer(marker)) {
+            visibleMarkers.push(marker);
+            windyAPI.map.removeLayer(marker);
+        }
+    });
+    
+    await new Promise(resolve => setTimeout(resolve, 500));
     
     try {
         const frameRect = frame.getBoundingClientRect();
         
-        // 1. Screenshot mit html2canvas
+        // Screenshot
         const canvas = await html2canvas(document.body, {
             useCORS: true,
             allowTaint: true,
@@ -416,32 +430,26 @@ async function exportImage() {
             logging: false
         });
         
-        // 2. Erstelle finalen Canvas
         const finalCanvas = document.createElement('canvas');
         finalCanvas.width = 540 * 2;
         finalCanvas.height = 368 * 2;
         const ctx = finalCanvas.getContext('2d');
         
         const scale = 2;
-        const sourceX = frameRect.left * scale;
-        const sourceY = frameRect.top * scale;
-        const sourceW = frameRect.width * scale;
-        const sourceH = frameRect.height * scale;
-        
-        // Kopiere Screenshot-Bereich
         ctx.drawImage(
             canvas,
-            sourceX, sourceY, sourceW, sourceH,
+            frameRect.left * scale, frameRect.top * scale,
+            frameRect.width * scale, frameRect.height * scale,
             0, 0, finalCanvas.width, finalCanvas.height
         );
         
-        // 3. ZEICHNE GPX-TRACK MANUELL
+        // ZEICHNE Track manuell
         if (trackLayer) {
             const latlngs = trackLayer.getLatLngs();
             
             if (latlngs.length > 0) {
                 ctx.strokeStyle = '#FFFFFF';
-                ctx.lineWidth = 10; // 5px * 2 (scale)
+                ctx.lineWidth = 10;
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
                 ctx.globalAlpha = 0.95;
@@ -449,10 +457,7 @@ async function exportImage() {
                 ctx.beginPath();
                 
                 latlngs.forEach((latlng, index) => {
-                    // Konvertiere Lat/Lng zu Pixel-Position
                     const point = windyAPI.map.latLngToContainerPoint(latlng);
-                    
-                    // Berechne Position relativ zum Frame
                     const mapRect = windyAPI.map.getContainer().getBoundingClientRect();
                     const x = (point.x - (frameRect.left - mapRect.left)) * scale;
                     const y = (point.y - (frameRect.top - mapRect.top)) * scale;
@@ -467,7 +472,7 @@ async function exportImage() {
                 ctx.stroke();
                 ctx.globalAlpha = 1.0;
                 
-                // Zeichne Start/End Marker
+                // Marker
                 const start = latlngs[0];
                 const end = latlngs[latlngs.length - 1];
                 
@@ -477,25 +482,23 @@ async function exportImage() {
                     const x = (point.x - (frameRect.left - mapRect.left)) * scale;
                     const y = (point.y - (frameRect.top - mapRect.top)) * scale;
                     
-                    // Weißer Rand
                     ctx.beginPath();
                     ctx.arc(x, y, 16, 0, Math.PI * 2);
                     ctx.fillStyle = '#FFFFFF';
                     ctx.fill();
                     
-                    // Farbiger Kreis
                     ctx.beginPath();
                     ctx.arc(x, y, 11, 0, Math.PI * 2);
                     ctx.fillStyle = color;
                     ctx.fill();
                 };
                 
-                drawMarker(start, '#34C759'); // Grün
-                drawMarker(end, '#FF3B30');   // Rot
+                drawMarker(start, '#34C759');
+                drawMarker(end, '#FF3B30');
             }
         }
         
-        // 4. Export mit EXIF
+        // EXIF etc. (bleibt gleich)
         const jpegDataUrl = finalCanvas.toDataURL('image/jpeg', 0.95);
         
         let exifObj = {};
@@ -570,14 +573,22 @@ async function exportImage() {
     } catch (error) {
         console.error('Export Error:', error);
         setStatus('❌ Fehler: ' + error.message);
-        alert('Export fehlgeschlagen:\n' + error.message);
     }
+    
+    // ZEIGE Track wieder an
+    if (trackWasVisible) {
+        windyAPI.map.addLayer(trackLayer);
+    }
+    visibleMarkers.forEach(marker => {
+        windyAPI.map.addLayer(marker);
+    });
     
     if (wasVisible) {
         controls.style.display = 'block';
         toggle.style.display = 'flex';
     }
 }
+
 
         
         // EXIF Helper Funktionen
@@ -759,31 +770,46 @@ async function exportImage() {
         }
         
         function displayTrack(coords) {
-            clearTrack();
-            
-            trackLayer = L.polyline(coords, {
-                color: '#FFFFFF',
-                weight: 5,
-                opacity: 0.95,
-                smoothFactor: 1
-            }).addTo(windyAPI.map);
-            
-            const start = L.circleMarker(coords[0], {
-                radius: 8, fillColor: '#34C759', color: 'white', weight: 3, fillOpacity: 1
-            }).addTo(windyAPI.map);
-            markers.push(start);
-            
-            const end = L.circleMarker(coords[coords.length - 1], {
-                radius: 8, fillColor: '#FF3B30', color: 'white', weight: 3, fillOpacity: 1
-            }).addTo(windyAPI.map);
-            markers.push(end);
-            
-            windyAPI.map.fitBounds(trackLayer.getBounds(), {
-                paddingTopLeft: [50, 80],
-                paddingBottomRight: [50, 80],
-                maxZoom: 14
-            });
-        }
+    clearTrack();
+    
+    // NUR BEIM ANZEIGEN: Zeichne Track auf Leaflet Map
+    trackLayer = L.polyline(coords, {
+        color: '#FFFFFF',
+        weight: 5,
+        opacity: 0.95,
+        smoothFactor: 1,
+        lineCap: 'round',
+        lineJoin: 'round'
+    }).addTo(windyAPI.map);
+    
+    // Start Marker (grün)
+    const start = L.circleMarker(coords[0], {
+        radius: 8,
+        fillColor: '#34C759',
+        color: 'white',
+        weight: 3,
+        fillOpacity: 1
+    }).addTo(windyAPI.map);
+    markers.push(start);
+    
+    // End Marker (rot)
+    const end = L.circleMarker(coords[coords.length - 1], {
+        radius: 8,
+        fillColor: '#FF3B30',
+        color: 'white',
+        weight: 3,
+        fillOpacity: 1
+    }).addTo(windyAPI.map);
+    markers.push(end);
+    
+    // Zoom auf Track
+    windyAPI.map.fitBounds(trackLayer.getBounds(), {
+        paddingTopLeft: [50, 80],
+        paddingBottomRight: [50, 80],
+        maxZoom: 14
+    });
+}
+
         
         function clearTrack() {
             if (trackLayer) windyAPI.map.removeLayer(trackLayer);
