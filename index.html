@@ -792,25 +792,54 @@
             }
         }
         
-        function setLayer(overlay) {
-            if (!windyAPI) return;
-            windyAPI.store.set('overlay', overlay);
-            
-            document.querySelectorAll('.controls button[class*="layer-"]').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.classList.add('active');
-        }
-        
         function toggleParticles() {
-            if (!windyAPI) return;
-            particlesEnabled = !particlesEnabled;
-            windyAPI.store.set('particlesAnim', particlesEnabled ? 'on' : 'off');
-            
-            const btn = document.getElementById('btnParticles');
-            btn.classList.toggle('active', particlesEnabled);
-            btn.textContent = particlesEnabled ? '💨 Partikel ✓' : '💨 Partikel';
-        }
+    if (!windyAPI) return;
+    particlesEnabled = !particlesEnabled;
+    
+    const btn = document.getElementById('btnParticles');
+    
+    if (particlesEnabled) {
+        windyAPI.store.set('overlay', 'wind'); // Wechsle zu Wind
+        windyAPI.store.set('particlesAnim', 'on');
+        btn.classList.add('active');
+        btn.textContent = '💨 Partikel ✓';
+        setStatus('Wind-Partikel aktiv');
+    } else {
+        windyAPI.store.set('particlesAnim', 'off');
+        btn.classList.remove('active');
+        btn.textContent = '💨 Partikel';
+        setStatus('Partikel aus');
+    }
+}
+
+function setLayer(overlay) {
+    if (!windyAPI) return;
+    
+    windyAPI.store.set('overlay', overlay);
+    
+    // Wenn nicht Wind-Layer, schalte Partikel aus
+    if (overlay !== 'wind' && particlesEnabled) {
+        particlesEnabled = false;
+        windyAPI.store.set('particlesAnim', 'off');
+        document.getElementById('btnParticles').classList.remove('active');
+        document.getElementById('btnParticles').textContent = '💨 Partikel';
+    }
+    
+    document.querySelectorAll('.controls button[class*="layer-"]').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    const layerNames = {
+        'temp': '🌡️ Temperatur',
+        'wind': '💨 Wind',
+        'rain': '🌧️ Regen',
+        'clouds': '☁️ Wolken'
+    };
+    
+    setStatus(layerNames[overlay] || overlay);
+}
+
         
         function resetAPIKey() {
             if (confirm('API Key löschen?\n\nDu musst die Seite dann neu mit ?key=... öffnen.')) {
