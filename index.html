@@ -75,17 +75,6 @@
                     transparent 15px
                 );
         }
-
-        /* Kreuz-Grid */
-.grid-overlay.cross {
-    background-image: none;
-}
-
-/* Wellen-Grid */
-.grid-overlay.wave {
-    background-image: none;
-}
-
         
         @media (max-width: 768px) {
             .screenshot-frame,
@@ -582,72 +571,39 @@
                 }
                 
                 // ZEICHNE GRID
-                // Draw grid
-if (gridVis) {
-    const g = document.getElementById('gridOverlay');
-    const gridStyle = g.dataset.gridStyle || 'normal';
-    
-    if (gridStyle === 'cross') {
-        // Zeichne Cross-Grid auf Export-Canvas
-        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-        ctx.fillStyle = 'rgba(255,255,255,0.15)';
-        ctx.lineWidth = 2;
-        
-        const gridSize = 120; // 60 * 2 (scale)
-        const crossSize = 12;
-        const dotSize = 3;
-        
-        for (let x = 0; x <= final.width; x += gridSize) {
-            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, final.height); ctx.stroke();
-        }
-        for (let y = 0; y <= final.height; y += gridSize) {
-            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(final.width, y); ctx.stroke();
-        }
-        
-        for (let x = 0; x <= final.width; x += gridSize) {
-            for (let y = 0; y <= final.height; y += gridSize) {
-                ctx.beginPath();
-                ctx.moveTo(x - crossSize, y); ctx.lineTo(x + crossSize, y);
-                ctx.moveTo(x, y - crossSize); ctx.lineTo(x, y + crossSize);
-                ctx.stroke();
-            }
-        }
-        
-        for (let x = gridSize / 2; x < final.width; x += gridSize) {
-            for (let y = gridSize / 2; y < final.height; y += gridSize) {
-                ctx.beginPath(); ctx.arc(x, y, dotSize, 0, Math.PI * 2); ctx.fill();
-            }
-        }
-    } else if (gridStyle === 'wave') {
-        // Wellen-Grid exportieren
-        const canvas = g.querySelector('canvas');
-        if (canvas) {
-            ctx.drawImage(canvas, 0, 0, final.width, final.height);
-        }
-    } else if (gridStyle === 'fine') {
-        // Bestehendes Fine Grid
-        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-        ctx.lineWidth = 2;
-        const gs = 20;
-        for (let x = 0; x < final.width; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, final.height); ctx.stroke(); }
-        for (let y = 0; y < final.height; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(final.width, y); ctx.stroke(); }
-    } else if (gridStyle === 'contour') {
-        // Bestehendes Contour Grid
-        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-        ctx.lineWidth = 2;
-        for (let y = 0; y < final.height; y += 30) {
-            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(final.width, y); ctx.stroke();
-        }
-    } else {
-        // Normal Grid
-        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-        ctx.lineWidth = 2;
-        const gs = 40;
-        for (let x = 0; x < final.width; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, final.height); ctx.stroke(); }
-        for (let y = 0; y < final.height; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(final.width, y); ctx.stroke(); }
-    }
-}
-
+                if (gridWasVisible) {
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                    ctx.lineWidth = 2;
+                    
+                    const grid = document.getElementById('gridOverlay');
+                    let gridSize = 40;
+                    
+                    if (grid.classList.contains('fine')) {
+                        gridSize = 20;
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+                    } else if (grid.classList.contains('contour')) {
+                        for (let y = 0; y < finalCanvas.height; y += 30) {
+                            ctx.beginPath();
+                            ctx.moveTo(0, y);
+                            ctx.lineTo(finalCanvas.width, y);
+                            ctx.stroke();
+                        }
+                    } else {
+                        for (let x = 0; x < finalCanvas.width; x += gridSize) {
+                            ctx.beginPath();
+                            ctx.moveTo(x, 0);
+                            ctx.lineTo(x, finalCanvas.height);
+                            ctx.stroke();
+                        }
+                        
+                        for (let y = 0; y < finalCanvas.height; y += gridSize) {
+                            ctx.beginPath();
+                            ctx.moveTo(0, y);
+                            ctx.lineTo(finalCanvas.width, y);
+                            ctx.stroke();
+                        }
+                    }
+                }
                 
                 // ZEICHNE TEXT
                 if (memeTextVisible && (topTextWasVisible || bottomTextWasVisible)) {
@@ -821,41 +777,20 @@ if (gridVis) {
         }
         
         function cycleGridStyle() {
-    const g = document.getElementById('gridOverlay');
-    
-    // Entferne alle Klassen
-    g.classList.remove('fine', 'contour', 'cross', 'wave');
-    
-    // Finde aktuellen Stil
-    const current = g.dataset.gridStyle || 'normal';
-    
-    const styles = ['normal', 'fine', 'contour', 'cross', 'wave'];
-    const currentIndex = styles.indexOf(current);
-    const nextIndex = (currentIndex + 1) % styles.length;
-    const nextStyle = styles[nextIndex];
-    
-    // Setze neuen Stil
-    g.dataset.gridStyle = nextStyle;
-    
-    if (nextStyle === 'fine') {
-        g.classList.add('fine');
-        setStatus('Grid: Fein');
-    } else if (nextStyle === 'contour') {
-        g.classList.add('contour');
-        setStatus('Grid: Linien');
-    } else if (nextStyle === 'cross') {
-        g.classList.add('cross');
-        drawCrossGrid();
-        setStatus('Grid: Kreuz');
-    } else if (nextStyle === 'wave') {
-        g.classList.add('wave');
-        drawWaveGrid();
-        setStatus('Grid: Wellen');
-    } else {
-        setStatus('Grid: Normal');
-    }
-}
-
+            const grid = document.getElementById('gridOverlay');
+            
+            if (!grid.classList.contains('fine') && !grid.classList.contains('contour')) {
+                grid.classList.add('fine');
+                setStatus('Fein');
+            } else if (grid.classList.contains('fine')) {
+                grid.classList.remove('fine');
+                grid.classList.add('contour');
+                setStatus('Linien');
+            } else {
+                grid.classList.remove('contour');
+                setStatus('Normal');
+            }
+        }
         
         function toggleParticles() {
     if (!windyAPI) return;
@@ -1047,159 +982,6 @@ function setLayer(overlay) {
         function setStatus(text) {
             document.getElementById('status').textContent = text;
         }
-        // Zeichne Kreuz-Grid
-function drawCrossGrid() {
-    const g = document.getElementById('gridOverlay');
-    
-    // Lösche altes Canvas
-    let canvas = g.querySelector('canvas');
-    if (canvas) canvas.remove();
-    
-    // Erstelle neues Canvas
-    canvas = document.createElement('canvas');
-    canvas.width = 540;
-    canvas.height = 368;
-    canvas.style.width = '100%';
-    canvas.style.height = '100%';
-    canvas.style.position = 'absolute';
-    canvas.style.top = '0';
-    canvas.style.left = '0';
-    g.appendChild(canvas);
-    
-    const ctx = canvas.getContext('2d');
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-    ctx.lineWidth = 1;
-    
-    const gridSize = 60;
-    const crossSize = 6;
-    const dotSize = 1.5;
-    
-    // Zeichne Linien
-    for (let x = 0; x <= canvas.width; x += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
-    }
-    
-    for (let y = 0; y <= canvas.height; y += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
-    }
-    
-    // Zeichne Kreuze an Schnittpunkten
-    for (let x = 0; x <= canvas.width; x += gridSize) {
-        for (let y = 0; y <= canvas.height; y += gridSize) {
-            ctx.beginPath();
-            ctx.moveTo(x - crossSize, y);
-            ctx.lineTo(x + crossSize, y);
-            ctx.moveTo(x, y - crossSize);
-            ctx.lineTo(x, y + crossSize);
-            ctx.stroke();
-        }
-    }
-    
-    // Zeichne Punkte in der Mitte jeder Zelle
-    for (let x = gridSize / 2; x < canvas.width; x += gridSize) {
-        for (let y = gridSize / 2; y < canvas.height; y += gridSize) {
-            ctx.beginPath();
-            ctx.arc(x, y, dotSize, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }
-}
-
-// Zeichne Wellen-Grid (randomisiert)
-function drawWaveGrid() {
-    const g = document.getElementById('gridOverlay');
-    
-    let canvas = g.querySelector('canvas');
-    if (canvas) canvas.remove();
-    
-    canvas = document.createElement('canvas');
-    canvas.width = 540;
-    canvas.height = 368;
-    canvas.style.width = '100%';
-    canvas.style.height = '100%';
-    canvas.style.position = 'absolute';
-    canvas.style.top = '0';
-    canvas.style.left = '0';
-    g.appendChild(canvas);
-    
-    const ctx = canvas.getContext('2d');
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-    ctx.lineWidth = 1.5;
-    
-    const rows = 12;
-    const cols = 16;
-    const cellWidth = canvas.width / cols;
-    const cellHeight = canvas.height / rows;
-    
-    // Randomisierte Wellen-Parameter
-    const waveAmp = 5 + Math.random() * 10; // 5-15px
-    const waveFreq = 0.02 + Math.random() * 0.03; // Frequenz
-    const offsetX = Math.random() * 100;
-    const offsetY = Math.random() * 100;
-    
-    // Zeichne horizontale Wellenlinien
-    for (let row = 0; row <= rows; row++) {
-        ctx.beginPath();
-        const baseY = row * cellHeight;
-        
-        for (let x = 0; x <= canvas.width; x += 2) {
-            const wave = Math.sin((x + offsetX) * waveFreq) * waveAmp;
-            const y = baseY + wave;
-            
-            if (x === 0) {
-                ctx.moveTo(x, y);
-            } else {
-                ctx.lineTo(x, y);
-            }
-        }
-        ctx.stroke();
-    }
-    
-    // Zeichne vertikale Wellenlinien
-    for (let col = 0; col <= cols; col++) {
-        ctx.beginPath();
-        const baseX = col * cellWidth;
-        
-        for (let y = 0; y <= canvas.height; y += 2) {
-            const wave = Math.sin((y + offsetY) * waveFreq * 0.8) * waveAmp;
-            const x = baseX + wave;
-            
-            if (y === 0) {
-                ctx.moveTo(x, y);
-            } else {
-                ctx.lineTo(x, y);
-            }
-        }
-        ctx.stroke();
-    }
-    
-    // Zeichne Punkte an den Schnittpunkten
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-    for (let row = 0; row <= rows; row++) {
-        for (let col = 0; col <= cols; col++) {
-            const baseX = col * cellWidth;
-            const baseY = row * cellHeight;
-            
-            const waveX = Math.sin((baseY + offsetY) * waveFreq * 0.8) * waveAmp;
-            const waveY = Math.sin((baseX + offsetX) * waveFreq) * waveAmp;
-            
-            const x = baseX + waveX;
-            const y = baseY + waveY;
-            
-            ctx.beginPath();
-            ctx.arc(x, y, 2, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }
-}
-
     </script>
 </body>
 </html>
