@@ -76,9 +76,21 @@
                 );
         }
         
+        .elevation-canvas {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 540px;
+            height: 368px;
+            pointer-events: none;
+            z-index: 470;
+        }
+        
         @media (max-width: 768px) {
             .screenshot-frame,
-            .grid-overlay {
+            .grid-overlay,
+            .elevation-canvas {
                 width: 90vw;
                 height: calc(90vw * 0.68);
             }
@@ -262,6 +274,8 @@
     
     <div class="grid-overlay" id="gridOverlay"></div>
     
+    <canvas class="elevation-canvas" id="elevationCanvas"></canvas>
+    
     <div class="controls" id="controls" style="display:none;">
         <button class="export-btn" onclick="exportImage()">📸 Bild speichern</button>
         
@@ -279,6 +293,9 @@
         <div class="toggle-group">
             <button id="btnShowGrid" class="active" onclick="toggleGrid()">Grid</button>
             <button onclick="cycleGridStyle()">Stil</button>
+        </div>
+        <div class="toggle-group">
+            <button id="btnShowElevation" class="active" onclick="toggleElevationProfile()">📈 Höhe</button>
         </div>
         
         <hr style="border: none; border-top: 1px solid rgba(0,0,0,0.1); margin: 6px 0;">
@@ -351,6 +368,19 @@
         
         let gpxStartTimestamp = null;
         let gpxMiddleCoords = null;
+        let gpxElevations = [];
+        let elevationVisible = true;
+        
+        // Höhenprofil-Konfiguration – wirkt subtil wie ein Teil des Grids.
+        // Werte beziehen sich auf eine Referenzbreite von 1080px (= 540px * 2, wie im Export).
+        const ELEVATION_CONFIG = {
+            referenceWidth: 1080,
+            heightPx: 70,        // Höhe des Profil-Bandes
+            bottomMargin: 24,    // Abstand von der Unterkante
+            fillOpacity: 0.08,
+            strokeOpacity: 0.28,
+            strokeWidth: 3
+        };
         
         // Zentrale Partikel-Konfiguration (Optik: Dichte, Geschwindigkeit etc.)
         const PARTICLES_CONFIG = {
@@ -475,6 +505,7 @@
             const controls = document.getElementById('controls');
             const toggle = document.getElementById('controlsToggle');
             const gridOverlay = document.getElementById('gridOverlay');
+            const elevationCanvas = document.getElementById('elevationCanvas');
             
             const wasVisible = controlsVisible;
             
@@ -488,10 +519,12 @@
             const topTextWasVisible = topText.style.display !== 'none';
             const bottomTextWasVisible = bottomText.style.display !== 'none';
             const gridWasVisible = gridOverlay.style.display !== 'none';
+            const elevationWasVisible = elevationVisible && elevationCanvas.style.display !== 'none';
             
             topText.style.display = 'none';
             bottomText.style.display = 'none';
             gridOverlay.style.display = 'none';
+            elevationCanvas.style.display = 'none';
             
             const trackWasVisible = windyAPI.map.hasLayer(trackLayer);
             if (trackWasVisible) {
@@ -628,6 +661,11 @@
                     }
                 }
                 
+                // ZEICHNE HÖHENPROFIL (wie Teil des Grids, halbtransparent, unter dem Text)
+                if (elevationWasVisible) {
+                    drawElevationProfileOnContext(ctx, finalCanvas.width, finalCanvas.height);
+                }
+                
                 // ZEICHNE TEXT
                 if (memeTextVisible && (topTextWasVisible || bottomTextWasVisible)) {
                     ctx.font = `900 ${settings.textTopSize}px Anton, Impact`;
@@ -733,6 +771,7 @@
             if (topTextWasVisible) topText.style.display = 'block';
             if (bottomTextWasVisible) bottomText.style.display = 'block';
             if (gridWasVisible) gridOverlay.style.display = 'block';
+            if (elevationWasVisible) elevationCanvas.style.display = 'block';
             
             if (trackWasVisible) {
                 windyAPI.map.addLayer(trackLayer);
@@ -814,6 +853,83 @@
                 setStatus('Normal');
             }
         }
+        
+        // ====== HÖHENPROFIL (Ele-Kurve von unten links nach unten rechts) ======
+        // Zeichnet die Kurve auf einen beliebigen Context/Größe (Live-Canvas ODER Export-Canvas).
+        // 'width'/'height' werden in Geräte-Pixeln übergeben; alle Config-Werte werden relativ
+        // zu ELEVATION_CONFIG.referenceWidth (1080px) skaliert, damit die Optik auf Desktop,
+        // Mobile und im Export konsistent bleibt.
+        function drawElevationProfileOnContext(ctx, width, height) {
+            if (!gpxElevations || gpxElevations.length < 2) return;
+            
+            const validValues = gpxElevations.filter(e => e !== null && !isNaN(e));
+            if (validValues.length < 2) return;
+            
+            const minEle = Math.min(...validValues);
+            const maxEle = Math.max(...validValues);
+            const range = (maxEle - minEle) || 1;
+            
+            const scaleFactor = width / ELEVATION_CONFIG.referenceWidth;
+            const profileHeight = ELEVATION_CONFIG.heightPx * scaleFactor;
+            const bottomMargin = ELEVATION_CONFIG.bottomMargin * scaleFactor;
+            const baseline = height - bottomMargin;
+            
+            const n = gpxElevations.length;
+            const stepX = width / (n - 1);
+            
+            const points = gpxElevations.map((ele, i) => {
+                const value = (ele === null || isNaN(ele)) ? minEle : ele;
+                const normalized = (value - minEle) / range;
+                return { x: i * stepX, y: baseline - normalized * profileHeight };
+            });
+            
+            // Fläche unter der Kurve – sehr transparent, wie Teil des Grids
+            ctx.beginPath();
+            points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+            ctx.lineTo(width, baseline);
+            ctx.lineTo(0, baseline);
+            ctx.closePath();
+            ctx.fillStyle = `rgba(255, 255, 255, ${ELEVATION_CONFIG.fillOpacity})`;
+            ctx.fill();
+            
+            // Kontur-Linie der Höhenkurve
+            ctx.beginPath();
+            points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+            ctx.strokeStyle = `rgba(255, 255, 255, ${ELEVATION_CONFIG.strokeOpacity})`;
+            ctx.lineWidth = ELEVATION_CONFIG.strokeWidth * scaleFactor;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.stroke();
+        }
+        
+        // Rendert die Live-Vorschau des Höhenprofils auf dem eigenen Canvas im Frame.
+        function renderElevationProfile() {
+            const canvas = document.getElementById('elevationCanvas');
+            if (!canvas) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const dpr = 2;
+            canvas.width = Math.round(rect.width * dpr);
+            canvas.height = Math.round(rect.height * dpr);
+            
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (!elevationVisible) return;
+            drawElevationProfileOnContext(ctx, canvas.width, canvas.height);
+        }
+        
+        function toggleElevationProfile() {
+            elevationVisible = !elevationVisible;
+            const btn = document.getElementById('btnShowElevation');
+            
+            btn.classList.toggle('active', elevationVisible);
+            btn.textContent = elevationVisible ? '📈 Höhe ✓' : '📈 Höhe';
+            
+            renderElevationProfile();
+        }
+        
+        window.addEventListener('resize', () => renderElevationProfile());
         
         // Wendet die Partikel-Optik-Einstellungen robust an (mit forceChange, damit Windy
         // die Werte nicht stillschweigend ignoriert).
@@ -901,6 +1017,11 @@
             ];
             
             displayTrack(coords);
+            
+            // Beispiel-Höhenprofil für den Testtrack (nach displayTrack, da
+            // displayTrack() intern clearTrack() aufruft und sonst überschreibt).
+            gpxElevations = [540, 610, 720, 690, 810, 650];
+            renderElevationProfile();
         }
         
         function loadGPX(event) {
@@ -931,6 +1052,7 @@
             
             const coords = [];
             const timestamps = [];
+            const elevations = [];
             
             points.forEach(pt => {
                 const lat = parseFloat(pt.getAttribute('lat'));
@@ -938,6 +1060,12 @@
                 
                 if (!isNaN(lat) && !isNaN(lon)) {
                     coords.push([lat, lon]);
+                    
+                    // Höhe index-sicher parallel zu coords speichern (null statt Lücke),
+                    // damit die Indizes nicht auseinanderlaufen.
+                    const eleElement = pt.querySelector('ele');
+                    const eleValue = eleElement ? parseFloat(eleElement.textContent) : null;
+                    elevations.push(isNaN(eleValue) ? null : eleValue);
                     
                     const timeElement = pt.querySelector('time');
                     if (timeElement) {
@@ -970,7 +1098,13 @@
             }
             
             gpxMiddleCoords = coords[middleIndex];
+            
             displayTrack(coords);
+            
+            // Nach displayTrack setzen, da displayTrack() intern clearTrack() aufruft
+            // und die Höhenwerte sonst sofort wieder zurückgesetzt würden.
+            gpxElevations = elevations;
+            renderElevationProfile();
         }
         
         function displayTrack(coords) {
@@ -1015,6 +1149,9 @@
             markers.forEach(m => windyAPI.map.removeLayer(m));
             trackLayer = null;
             markers = [];
+            
+            gpxElevations = [];
+            renderElevationProfile();
         }
         
         function setStatus(text) {
