@@ -293,7 +293,7 @@
             <button class="layer-clouds" onclick="setLayer('clouds', event)">☁️</button>
         </div>
         
-        <button id="btnParticles" onclick="toggleParticles()">💨 Partikel</button>
+        <button id="btnParticles" class="active" onclick="toggleParticles()">💨 Partikel ✓</button>
         
         <hr style="border: none; border-top: 1px solid rgba(0,0,0,0.1); margin: 6px 0;">
         
@@ -408,7 +408,21 @@
                 windyAPI = api;
                 window.W = api;
                 api.store.set('overlay', 'temp');
-                api.store.set('particlesAnim', 'off');
+                
+                // WICHTIG: particlesAnim NIE beim Start auf 'off' setzen!
+                // Windy initialisiert die Wind-Vektordaten für die Partikel-Engine
+                // offenbar nur beim ersten Laden. Wird 'particlesAnim' hier explizit
+                // deaktiviert, bleibt die Datenquelle leer und ein späteres
+                // store.set('particlesAnim', 'on') zeigt dann nichts an.
+                // Stattdessen: Engine von Anfang an aktiv lassen und nur das
+                // 'particles'-Styling-Objekt setzen (wie im ursprünglich
+                // funktionierenden Prototyp).
+                api.store.set('particlesAnim', 'on', { forceChange: true });
+                api.store.set('particles', PARTICLES_CONFIG, { forceChange: true });
+                
+                // Sichtbarkeit wird jetzt rein über den Button-Status gesteuert
+                // (siehe toggleParticles) statt über particlesAnim off/on.
+                particlesEnabled = true;
                 
                 document.getElementById('controls').style.display = 'block';
                 setStatus('✅ Bereit!');
@@ -803,12 +817,19 @@
         
         // Wendet die Partikel-Optik-Einstellungen robust an (mit forceChange, damit Windy
         // die Werte nicht stillschweigend ignoriert).
-        function applyParticlesConfig() {
+        function applyParticlesConfig(opacity) {
             if (!windyAPI) return;
             windyAPI.store.set('particlesAnim', 'on', { forceChange: true });
-            windyAPI.store.set('particles', PARTICLES_CONFIG, { forceChange: true });
+            windyAPI.store.set('particles', {
+                ...PARTICLES_CONFIG,
+                opacity: opacity
+            }, { forceChange: true });
         }
         
+        // WICHTIG: 'particlesAnim' wird bewusst NIE mehr auf 'off' gesetzt – siehe
+        // Kommentar in initWindy(). Der Toggle-Button steuert die Sichtbarkeit
+        // stattdessen über die 'opacity' im 'particles'-Objekt (0 = unsichtbar,
+        // aber Engine bleibt aktiv/geladen).
         function toggleParticles() {
             if (!windyAPI) return;
             particlesEnabled = !particlesEnabled;
@@ -816,19 +837,14 @@
             const btn = document.getElementById('btnParticles');
             
             if (particlesEnabled) {
-                // Overlay bleibt unverändert (Partikel funktionieren auch bei Temperatur) –
-                // NICHT mehr zwangsweise auf 'wind' umschalten.
-                applyParticlesConfig();
-                
-                // Kurze Verzögerung als Absicherung, falls der Store beim ersten Aufruf
-                // die Werte noch nicht übernommen hat.
-                setTimeout(applyParticlesConfig, 200);
+                applyParticlesConfig(PARTICLES_CONFIG.opacity);
+                setTimeout(() => applyParticlesConfig(PARTICLES_CONFIG.opacity), 200);
                 
                 btn.classList.add('active');
                 btn.textContent = '💨 Partikel ✓';
                 setStatus('Partikel aktiv');
             } else {
-                windyAPI.store.set('particlesAnim', 'off', { forceChange: true });
+                applyParticlesConfig(0);
                 btn.classList.remove('active');
                 btn.textContent = '💨 Partikel';
                 setStatus('Partikel aus');
@@ -842,9 +858,8 @@
             
             // Partikel bleiben bei jedem Layer aktiv (auch Temperatur) – nach Overlay-Wechsel
             // Einstellungen erneut anwenden, da Windy sie beim Wechsel intern zurücksetzen kann.
-            if (particlesEnabled) {
-                setTimeout(applyParticlesConfig, 200);
-            }
+            const currentOpacity = particlesEnabled ? PARTICLES_CONFIG.opacity : 0;
+            setTimeout(() => applyParticlesConfig(currentOpacity), 200);
             
             document.querySelectorAll('.controls button[class*="layer-"]').forEach(btn => {
                 btn.classList.remove('active');
