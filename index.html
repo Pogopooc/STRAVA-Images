@@ -285,12 +285,12 @@
         
         <div class="section-title">🌦️ Layer</div>
         <div class="toggle-group">
-            <button class="layer-temp active" onclick="setLayer('temp')">🌡️</button>
-            <button class="layer-wind" onclick="setLayer('wind')">💨</button>
+            <button class="layer-temp active" onclick="setLayer('temp', event)">🌡️</button>
+            <button class="layer-wind" onclick="setLayer('wind', event)">💨</button>
         </div>
         <div class="toggle-group">
-            <button class="layer-rain" onclick="setLayer('rain')">🌧️</button>
-            <button class="layer-clouds" onclick="setLayer('clouds')">☁️</button>
+            <button class="layer-rain" onclick="setLayer('rain', event)">🌧️</button>
+            <button class="layer-clouds" onclick="setLayer('clouds', event)">☁️</button>
         </div>
         
         <button id="btnParticles" onclick="toggleParticles()">💨 Partikel</button>
@@ -351,6 +351,15 @@
         
         let gpxStartTimestamp = null;
         let gpxMiddleCoords = null;
+        
+        // Zentrale Partikel-Konfiguration (Optik: Dichte, Geschwindigkeit etc.)
+        const PARTICLES_CONFIG = {
+            multiplier: 1.0,
+            velocity: 1.8,
+            width: 1.2,
+            blending: 1.05,
+            opacity: 1.2
+        };
         
         // ====== KONFIGURATION FÜR DESKTOP & MOBILE ======
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
@@ -792,54 +801,68 @@
             }
         }
         
+        // Wendet die Partikel-Optik-Einstellungen robust an (mit forceChange, damit Windy
+        // die Werte nicht stillschweigend ignoriert).
+        function applyParticlesConfig() {
+            if (!windyAPI) return;
+            windyAPI.store.set('particlesAnim', 'on', { forceChange: true });
+            windyAPI.store.set('particles', PARTICLES_CONFIG, { forceChange: true });
+        }
+        
         function toggleParticles() {
-    if (!windyAPI) return;
-    particlesEnabled = !particlesEnabled;
-    
-    const btn = document.getElementById('btnParticles');
-    
-    if (particlesEnabled) {
-        windyAPI.store.set('overlay', 'wind'); // Wechsle zu Wind
-        windyAPI.store.set('particlesAnim', 'on');
-        btn.classList.add('active');
-        btn.textContent = '💨 Partikel ✓';
-        setStatus('Wind-Partikel aktiv');
-    } else {
-        windyAPI.store.set('particlesAnim', 'off');
-        btn.classList.remove('active');
-        btn.textContent = '💨 Partikel';
-        setStatus('Partikel aus');
-    }
-}
-
-function setLayer(overlay) {
-    if (!windyAPI) return;
-    
-    windyAPI.store.set('overlay', overlay);
-    
-    // Wenn nicht Wind-Layer, schalte Partikel aus
-    if (overlay !== 'wind' && particlesEnabled) {
-        particlesEnabled = false;
-        windyAPI.store.set('particlesAnim', 'off');
-        document.getElementById('btnParticles').classList.remove('active');
-        document.getElementById('btnParticles').textContent = '💨 Partikel';
-    }
-    
-    document.querySelectorAll('.controls button[class*="layer-"]').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    event.target.classList.add('active');
-    
-    const layerNames = {
-        'temp': '🌡️ Temperatur',
-        'wind': '💨 Wind',
-        'rain': '🌧️ Regen',
-        'clouds': '☁️ Wolken'
-    };
-    
-    setStatus(layerNames[overlay] || overlay);
-}
-
+            if (!windyAPI) return;
+            particlesEnabled = !particlesEnabled;
+            
+            const btn = document.getElementById('btnParticles');
+            
+            if (particlesEnabled) {
+                // Overlay bleibt unverändert (Partikel funktionieren auch bei Temperatur) –
+                // NICHT mehr zwangsweise auf 'wind' umschalten.
+                applyParticlesConfig();
+                
+                // Kurze Verzögerung als Absicherung, falls der Store beim ersten Aufruf
+                // die Werte noch nicht übernommen hat.
+                setTimeout(applyParticlesConfig, 200);
+                
+                btn.classList.add('active');
+                btn.textContent = '💨 Partikel ✓';
+                setStatus('Partikel aktiv');
+            } else {
+                windyAPI.store.set('particlesAnim', 'off', { forceChange: true });
+                btn.classList.remove('active');
+                btn.textContent = '💨 Partikel';
+                setStatus('Partikel aus');
+            }
+        }
+        
+        function setLayer(overlay, event) {
+            if (!windyAPI) return;
+            
+            windyAPI.store.set('overlay', overlay, { forceChange: true });
+            
+            // Partikel bleiben bei jedem Layer aktiv (auch Temperatur) – nach Overlay-Wechsel
+            // Einstellungen erneut anwenden, da Windy sie beim Wechsel intern zurücksetzen kann.
+            if (particlesEnabled) {
+                setTimeout(applyParticlesConfig, 200);
+            }
+            
+            document.querySelectorAll('.controls button[class*="layer-"]').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            if (event && event.target) {
+                event.target.classList.add('active');
+            }
+            
+            const layerNames = {
+                'temp': '🌡️ Temperatur',
+                'wind': '💨 Wind',
+                'rain': '🌧️ Regen',
+                'clouds': '☁️ Wolken'
+            };
+            
+            setStatus(layerNames[overlay] || overlay);
+        }
         
         function resetAPIKey() {
             if (confirm('API Key löschen?\n\nDu musst die Seite dann neu mit ?key=... öffnen.')) {
