@@ -375,11 +375,14 @@
         // Werte beziehen sich auf eine Referenzbreite von 1080px (= 540px * 2, wie im Export).
         const ELEVATION_CONFIG = {
             referenceWidth: 1080,
-            heightPx: 70,        // Höhe des Profil-Bandes
-            bottomMargin: 24,    // Abstand von der Unterkante
             fillOpacity: 0.08,
             strokeOpacity: 0.28,
-            strokeWidth: 3
+            strokeWidth: 3,
+            // Feste Skala statt dynamischem Min/Max: unterste Kante des Grids = 0 müm,
+            // oberste Kante des Grids = 5913 müm (Höhe der aktuell höchsten Passstrasse
+            // der Welt, Mig La). So bleibt die Kurve über verschiedene Tracks vergleichbar.
+            scaleMinMeters: 0,
+            scaleMaxMeters: 5913
         };
         
         // Zentrale Partikel-Konfiguration (Optik: Dichte, Geschwindigkeit etc.)
@@ -865,25 +868,27 @@
             const validValues = gpxElevations.filter(e => e !== null && !isNaN(e));
             if (validValues.length < 2) return;
             
-            const minEle = Math.min(...validValues);
-            const maxEle = Math.max(...validValues);
+            // Feste Skala: unterste Kante des Grids = scaleMinMeters (0 müm),
+            // oberste Kante des Grids = scaleMaxMeters (5913 müm).
+            const minEle = ELEVATION_CONFIG.scaleMinMeters;
+            const maxEle = ELEVATION_CONFIG.scaleMaxMeters;
             const range = (maxEle - minEle) || 1;
             
-            const scaleFactor = width / ELEVATION_CONFIG.referenceWidth;
-            const profileHeight = ELEVATION_CONFIG.heightPx * scaleFactor;
-            const bottomMargin = ELEVATION_CONFIG.bottomMargin * scaleFactor;
-            const baseline = height - bottomMargin;
+            // baseline = unterste Kante des Grids (0 müm), volle Höhe verfügbar bis oben.
+            const baseline = height;
             
             const n = gpxElevations.length;
             const stepX = width / (n - 1);
             
             const points = gpxElevations.map((ele, i) => {
                 const value = (ele === null || isNaN(ele)) ? minEle : ele;
-                const normalized = (value - minEle) / range;
-                return { x: i * stepX, y: baseline - normalized * profileHeight };
+                const clamped = Math.max(minEle, Math.min(maxEle, value));
+                const normalized = (clamped - minEle) / range;
+                return { x: i * stepX, y: baseline - normalized * height };
             });
             
-            // Fläche unter der Kurve – sehr transparent, wie Teil des Grids
+            // Fläche unter der Kurve – sehr transparent, wie Teil des Grids.
+            // Füllung reicht bis ganz nach unten (0 müm = unterste Grid-Kante).
             ctx.beginPath();
             points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
             ctx.lineTo(width, baseline);
@@ -893,6 +898,7 @@
             ctx.fill();
             
             // Kontur-Linie der Höhenkurve
+            const scaleFactor = width / ELEVATION_CONFIG.referenceWidth;
             ctx.beginPath();
             points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
             ctx.strokeStyle = `rgba(255, 255, 255, ${ELEVATION_CONFIG.strokeOpacity})`;
